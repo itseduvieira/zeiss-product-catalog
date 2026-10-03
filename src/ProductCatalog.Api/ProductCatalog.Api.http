@@ -1,0 +1,49 @@
+@host = http://localhost:5158
+
+### List products
+GET {{host}}/api/products
+
+### Search by part of the name
+GET {{host}}/api/products/search?name=star
+
+### Products with stock between min and max (inclusive)
+GET {{host}}/api/products/stock-level?min=0&max=5
+
+### One product
+GET {{host}}/api/products/100001
+
+### Categories (needed when creating a product)
+GET {{host}}/api/categories
+
+### Create
+POST {{host}}/api/products
+Content-Type: application/json
+
+{
+  "name": "Lens cloth",
+  "description": "Microfiber",
+  "price": 12.50,
+  "stock": 20,
+  "categoryId": 3
+}
+
+### Update
+PUT {{host}}/api/products/100001
+Content-Type: application/json
+
+{
+  "name": "Primo Star",
+  "description": "Upright microscope used in teaching labs.",
+  "price": 2450.00,
+  "stock": 6,
+  "categoryId": 1
+}
+
+### Decrement stock
+POST {{host}}/api/products/100005/decrement-stock/1
+
+### Add stock
+POST {{host}}/api/products/100007/add-to-stock/2
+
+### Delete
+DELETE {{host}}/api/products/100006

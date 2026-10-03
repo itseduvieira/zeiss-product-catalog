@@ -1,0 +1,12 @@
+**/.git
+**/.vs
+**/.idea
+**/.vscode
+**/bin
+**/obj
+**/tests
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/*.user
+**/*.md
