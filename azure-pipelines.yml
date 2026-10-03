@@ -1,0 +1,30 @@
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: UseDotNet@2
+    inputs:
+      packageType: sdk
+      version: 10.0.x
+
+  - script: dotnet test --configuration Release
+    displayName: Test
+
+  - task: DotNetCoreCLI@2
+    displayName: Publish
+    inputs:
+      command: publish
+      publishWebProjects: true
+      arguments: --configuration Release --output $(Build.ArtifactStagingDirectory)
+      zipAfterPublish: true
+
+  - task: AzureWebApp@1
+    displayName: Deploy
+    inputs:
+      azureSubscription: azure-catalog
+      appType: webAppLinux
+      appName: <your-app-name>
+      package: $(Build.ArtifactStagingDirectory)/**/*.zip
