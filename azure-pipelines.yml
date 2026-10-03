@@ -26,5 +26,5 @@ steps:
     inputs:
       azureSubscription: azure-catalog
       appType: webAppLinux
-      appName: <your-app-name>
+      appName: https://zeiss-product-catalog.azurewebsites.net
       package: $(Build.ArtifactStagingDirectory)/**/*.zip
