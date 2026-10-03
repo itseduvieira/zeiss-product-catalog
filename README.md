@@ -10,6 +10,16 @@ REST API for product records, stock changes, and catalog queries.
 
 The Product Catalog API stores products in a SQLite database and exposes them over HTTP. It covers the usual create, read, update, and delete operations, plus stock adjustments, a name search, and a stock-range query. Product ids are 6-digit integers taken from a database sequence, so two processes that share one database file do not receive the same id. It is for backend developers who build or review ASP.NET Core services and want a small catalog API with EF Core migrations, validation, and container manifests.
 
+## Deployed environment
+
+The source is at [itseduvieira/zeiss-product-catalog](https://github.com/itseduvieira/zeiss-product-catalog).
+
+An Azure DevOps pipeline builds the API, runs `dotnet test`, and deploys it to Azure App Service. The pipeline file is `azure-pipelines.yml`. The App Service name is `zeiss-product-catalog`, in Spain Central, and it runs one Linux instance on .NET 10.
+
+The live API is at [https://zeiss-product-catalog-fvaqa4fcccdpcga7.spaincentral-01.azurewebsites.net/api/products](https://zeiss-product-catalog-fvaqa4fcccdpcga7.spaincentral-01.azurewebsites.net/api/products). Swagger is at [/swagger](https://zeiss-product-catalog-fvaqa4fcccdpcga7.spaincentral-01.azurewebsites.net/swagger). The root URL returns 404 because the API has no page there.
+
+The same application can be started with Docker Compose or on a local Kubernetes cluster. Those steps are in **Installation** below.
+
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) 10.0.100 or a later 10.0 patch. `global.json` sets `rollForward` to `latestMinor`.
