@@ -8,7 +8,9 @@ public class Product
 
     public string? Description { get; set; }
 
-    public decimal Price { get; set; }
+    public long PriceMinorUnits { get; private set; }
+
+    public Money Price => new(PriceMinorUnits);
 
     public int Stock { get; set; }
 
@@ -19,4 +21,6 @@ public class Product
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    public void SetPrice(decimal amount) => PriceMinorUnits = Money.FromAmount(amount).MinorUnits;
 }

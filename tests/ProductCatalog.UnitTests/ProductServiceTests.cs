@@ -21,6 +21,10 @@ public class ProductServiceTests
             Assert.InRange(product.Id, ProductRules.MinId, ProductRules.MaxId);
             Assert.Contains(SeedData.Categories(), category => category.Id == product.CategoryId);
         });
+        Assert.Equal(245000, products.Single(product => product.Id == 100001).PriceMinorUnits);
+        Assert.Equal(2450.00m, products.Single(product => product.Id == 100001).Price.Amount);
+        Assert.Equal(410050, products.Single(product => product.Id == 100004).PriceMinorUnits);
+        Assert.Equal(29.90m, products.Single(product => product.Id == 100006).Price.Amount);
     }
 
     [Fact]
@@ -54,6 +58,7 @@ public class ProductServiceTests
         Assert.Equal(SeedData.LastSeededProductId + 1, created.Id);
         Assert.Equal("Lens cloth", created.Name);
         Assert.Null(created.Description);
+        Assert.Equal(12.50m, created.Price);
         Assert.Equal(3, created.Stock);
         Assert.Equal("Accessories", created.CategoryName);
     }

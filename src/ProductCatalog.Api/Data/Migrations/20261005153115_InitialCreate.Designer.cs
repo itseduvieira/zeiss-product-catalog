@@ -11,7 +11,7 @@ using ProductCatalog.Api.Data;
 namespace ProductCatalog.Api.Data.Migrations
 {
     [DbContext(typeof(CatalogDbContext))]
-    [Migration("20261002131222_InitialCreate")]
+    [Migration("20261005153115_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -105,9 +105,8 @@ namespace ProductCatalog.Api.Data.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                    b.Property<long>("PriceMinorUnits")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Stock")
                         .HasColumnType("INTEGER");
@@ -121,6 +120,8 @@ namespace ProductCatalog.Api.Data.Migrations
 
                     b.HasIndex("Name");
 
+                    b.HasIndex("PriceMinorUnits");
+
                     b.HasIndex("Stock");
 
                     b.ToTable("Products");
@@ -133,7 +134,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Upright microscope used in teaching labs.",
                             Name = "Primo Star",
-                            Price = 2450.00m,
+                            PriceMinorUnits = 245000L,
                             Stock = 6,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -144,7 +145,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Compact stereo microscope with an integrated camera.",
                             Name = "Stemi 305",
-                            Price = 1890.00m,
+                            PriceMinorUnits = 189000L,
                             Stock = 4,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -155,7 +156,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Microscope camera for routine color imaging.",
                             Name = "Axiocam 208 color",
-                            Price = 3200.00m,
+                            PriceMinorUnits = 320000L,
                             Stock = 2,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -166,7 +167,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "High-resolution objective.",
                             Name = "Plan-Apochromat 20x",
-                            Price = 4100.50m,
+                            PriceMinorUnits = 410050L,
                             Stock = 8,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -177,7 +178,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Calibration slide, 1 mm scale.",
                             Name = "Stage micrometer",
-                            Price = 85.00m,
+                            PriceMinorUnits = 8500L,
                             Stock = 40,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -188,7 +189,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Soft cover for an upright stand.",
                             Name = "Dust cover",
-                            Price = 29.90m,
+                            PriceMinorUnits = 2990L,
                             Stock = 15,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -199,7 +200,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Replacement transmitted-light source.",
                             Name = "LED illuminator",
-                            Price = 210.00m,
+                            PriceMinorUnits = 21000L,
                             Stock = 0,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -210,7 +211,7 @@ namespace ProductCatalog.Api.Data.Migrations
                             CreatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Widefield eyepiece.",
                             Name = "Eyepiece 10x/23",
-                            Price = 160.00m,
+                            PriceMinorUnits = 16000L,
                             Stock = 12,
                             UpdatedAt = new DateTime(2024, 6, 1, 8, 0, 0, 0, DateTimeKind.Utc)
                         });

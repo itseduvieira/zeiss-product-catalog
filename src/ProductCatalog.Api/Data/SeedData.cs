@@ -42,16 +42,19 @@ public static class SeedData
         Item(100008, "Eyepiece 10x/23", "Widefield eyepiece.", 160.00m, 12, 2)
     ];
 
-    private static Product Item(int id, string name, string description, decimal price, int stock, int categoryId) =>
-        new()
+    private static Product Item(int id, string name, string description, decimal price, int stock, int categoryId)
+    {
+        var product = new Product
         {
             Id = id,
             Name = name,
             Description = description,
-            Price = price,
             Stock = stock,
             CategoryId = categoryId,
             CreatedAt = SeededAt,
             UpdatedAt = SeededAt
         };
+        product.SetPrice(price);
+        return product;
+    }
 }

@@ -44,6 +44,7 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+    CatalogConnection.DeleteDatabaseIfHistoryIsUnknown(connectionString, db.Database.GetMigrations());
     db.Database.Migrate();
 }
 

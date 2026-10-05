@@ -92,12 +92,12 @@ public sealed class ProductService : IProductService
         {
             Name = request.Name!.Trim(),
             Description = CleanDescription(request.Description),
-            Price = request.Price,
             Stock = request.Stock,
             CategoryId = request.CategoryId,
             CreatedAt = now,
             UpdatedAt = now
         };
+        product.SetPrice(request.Price);
 
         await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
         product.Id = await _ids.NextAsync(cancellationToken);
@@ -121,7 +121,7 @@ public sealed class ProductService : IProductService
 
         product.Name = request.Name!.Trim();
         product.Description = CleanDescription(request.Description);
-        product.Price = request.Price;
+        product.SetPrice(request.Price);
         product.Stock = request.Stock;
         product.CategoryId = request.CategoryId;
         product.UpdatedAt = DateTime.UtcNow;
@@ -239,7 +239,7 @@ public sealed class ProductService : IProductService
         Id = product.Id,
         Name = product.Name,
         Description = product.Description,
-        Price = product.Price,
+        Price = product.Price.Amount,
         Stock = product.Stock,
         CategoryId = product.CategoryId,
         CategoryName = product.Category?.Name ?? "",

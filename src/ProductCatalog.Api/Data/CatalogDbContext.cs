@@ -41,7 +41,8 @@ public class CatalogDbContext : DbContext
             product.Property(p => p.Id).ValueGeneratedNever();
             product.Property(p => p.Name).HasMaxLength(ProductRules.NameMaxLength).IsRequired();
             product.Property(p => p.Description).HasMaxLength(ProductRules.DescriptionMaxLength);
-            product.Property(p => p.Price).HasPrecision(18, 2);
+            product.Ignore(p => p.Price);
+            product.HasIndex(p => p.PriceMinorUnits);
 
             product.HasOne(p => p.Category)
                 .WithMany(c => c.Products)

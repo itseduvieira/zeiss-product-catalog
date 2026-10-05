@@ -91,7 +91,7 @@ No environment variable is required to start the API. Set these when you need a 
 | `ASPNETCORE_URLS`            | No       | Unset                                                                   | Full listen URL. When set, it overrides the launch-profile URL.                                                                                                    |
 
 
-To recreate the local database, stop the API and delete `src/ProductCatalog.Api/catalog.db`. The next start applies the migration and writes the seed again. For Compose, `docker compose down -v` deletes the `catalog-data` volume.
+To recreate the local database, stop the API and delete `src/ProductCatalog.Api/catalog.db`. The next start applies the migration and writes the seed again. Startup also deletes a database file whose migration history names a migration this build does not contain, then seeds that file again. For Compose, `docker compose down -v` deletes the `catalog-data` volume.
 
 ## Usage
 
@@ -152,7 +152,7 @@ Validation rules:
 
 - `name` is not blank and has at most 120 characters.
 - `description` is optional and has at most 2000 characters.
-- `price` is a decimal, not a double. It must be more than 0, at most 1000000, and it can have at most 2 decimal places.
+- `price` must be more than 0, at most 1000000, and it can have at most 2 decimal places. The database stores the euro amount as integer cents.
 - `stock` is from 0 through 1000000. If the JSON omits `stock`, the API stores 0.
 - `categoryId` must match a category row. The seed ids are `1` Microscopes, `2` Optics, and `3` Accessories.
 
@@ -196,7 +196,7 @@ The assessment asks for a product API with these rules:
 
 ### Decisions
 
-Price is a `decimal`. A `double` cannot store values such as 0.10 exactly, so it is a poor type for money. The database column keeps 2 decimal places.
+The API accepts `price` as a decimal, because a double cannot store values such as 0.10 exactly. Every amount is euro. SQLite stores that amount as integer cents in `PriceMinorUnits`, so a range compares numbers. Another currency would be a later change.
 
 There is no repository and no DAO. `CatalogDbContext` already reads and writes the database. `ProductService` uses that context. One extra wrapper class would only repeat the same calls.
 
