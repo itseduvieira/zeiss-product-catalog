@@ -1,0 +1,709 @@
+/*
+ * Product Catalog design system. Tokens first, then the few elements and classes the app uses.
+ * Components have no styles of their own; everything they need is here.
+ */
+
+:root {
+  /* Color, from the ZEISS design tokens on zeiss.com (light theme) */
+  --paper: #f5f8fa; /* page background */
+  --surface: #ffffff; /* header, footer, cards, inputs */
+  --ink: #32373e; /* text */
+  --muted: #606a76; /* secondary text */
+  --line: #c2cdd6; /* borders, empty scale */
+  --accent: #0072ef; /* fills you can act on: primary button, filled scale */
+  --link: #0065d1; /* link text, darker than --accent so it stays readable on --paper */
+  --hover: #0052aa; /* links and the primary button under the pointer */
+  --focus: #00346c; /* keyboard focus outline */
+  --danger: #b21212; /* errors, out of stock, delete */
+  --field-focus: #ecf0f4; /* the fill of a field you are typing in */
+  --field-error: #fe7a7a33; /* the red tint of a field with a wrong value */
+  --row-hover: #ecf0f4; /* a table row under the pointer, the ZEISS list hover color */
+  --line-on-ink: #4e565f; /* borders on --ink, the ZEISS dark theme border-subtle */
+
+  /* Type: one family on the ZEISS sizes of 12, 14, 16, 18 and 20 px */
+  --font: 'Instrument Sans', system-ui, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+
+  /* Space and shape */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2.5rem;
+  --radius: 3px; /* buttons */
+  --radius-card: 0.75rem; /* cards, 12 px: containers are rounder than the controls inside them */
+  --field: 2.625rem; /* field height, 42 px */
+  --page: 60rem;
+}
+
+/* Base */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--text-md) / 1.5 var(--font);
+}
+
+h1 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+p {
+  margin: 0 0 var(--space-3);
+}
+
+a {
+  color: var(--link);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Layout: header, main and footer share one centered column */
+
+app-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.bar,
+.page {
+  width: 100%;
+  padding-inline: max(var(--space-3), (100% - var(--page)) / 2);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--surface);
+}
+
+header.bar {
+  min-height: 4rem;
+  border-bottom: 1px solid var(--line);
+}
+
+footer.bar {
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+footer.bar p {
+  margin: 0;
+}
+
+/*
+ * The screen area is a column that fills the space between header and footer.
+ * The routed screen lays its parts out directly in that column, so a part can sit at its bottom.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding-block: var(--space-5);
+}
+
+.page > :not(router-outlet) {
+  display: contents;
+}
+
+/* The ZEISS logo and the app name in the header, centered on one line */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* Items in a wrapping line, all as tall as the tallest, so buttons line up with inputs */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+/* In a .row: .grow takes the free width */
+.grow {
+  flex: 1 1 14rem;
+}
+
+/* The top of a screen: the title and a muted subtitle on the left, the screen's actions on the right */
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+/*
+ * The title and subtitle, exactly as tall as the buttons beside them, so the row lines up.
+ * A 24 px title line and a 16 px subtitle line fill the 42 px with 2 px between them.
+ */
+.title {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: var(--field);
+}
+
+.title > * {
+  margin: 0;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: 1rem;
+}
+
+/* A dark square with a white icon, placed before a title and as tall as it */
+.icon-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--field);
+  height: var(--field);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+/* The filters above a table: labelled fields lined up along their bottom edge */
+.toolbar {
+  align-items: flex-end;
+  justify-content: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+/* Under a table: the total, the page numbers, and the page size */
+.table-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.toolbar > .field {
+  margin-bottom: 0;
+}
+
+.crumbs {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* Controls */
+
+/* Buttons are as tall as fields, so the two line up in any row */
+button,
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2); /* between an icon and the text */
+  min-height: var(--field);
+  padding: 0 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 var(--text-sm) / 1 var(--font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+button:hover,
+.button:hover {
+  border-color: var(--muted);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button:disabled:hover {
+  border-color: var(--line);
+}
+
+/* A small borderless button holding only an icon, such as the page arrows */
+.icon-button {
+  width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+
+.icon-button:hover {
+  border-color: transparent;
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+/* The page arrows and the range under a table, kept small */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* A small gray button with a short text, such as "1–10 of 12 products" */
+.pill {
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 6px;
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.pill:hover {
+  background: var(--field-focus);
+  color: var(--ink);
+}
+
+/* A small list of choices that opens above the button before it */
+.page-size {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 20;
+  min-width: 10.5rem;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.menu > p {
+  margin: 0;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.menu > button {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-size: var(--text-md);
+  font-weight: 400;
+}
+
+.menu > button:hover {
+  background: var(--row-hover);
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.primary:hover {
+  border-color: var(--hover);
+  background: var(--hover);
+  color: var(--surface);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.danger:hover {
+  border-color: var(--danger);
+}
+
+/* Fields follow the ZEISS sign-in page: a white field with a line under it, no box */
+input,
+select,
+textarea {
+  min-height: var(--field);
+  padding: var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-bottom-color: var(--ink);
+}
+
+/* A focused field shows its fill and a --focus underline, without the outline ring that buttons and links get */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-bottom-color: var(--focus);
+  background: var(--field-focus);
+}
+
+/* Angular marks a field ng-invalid and ng-touched once the user has left it with a wrong value */
+input.ng-invalid.ng-touched,
+select.ng-invalid.ng-touched,
+textarea.ng-invalid.ng-touched {
+  border-bottom-color: var(--danger);
+  background: var(--field-error);
+}
+
+textarea {
+  resize: vertical;
+}
+
+input[type='checkbox'] {
+  width: 1rem;
+  height: 1rem;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--focus);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 32rem;
+  margin-bottom: var(--space-3);
+}
+
+.field > span {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* A number box, such as a quantity or a stock limit */
+.short {
+  width: 7rem;
+}
+
+/* Data */
+
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+}
+
+/* A column heading that sorts the table. The th's aria-sort decides the arrow. */
+.sort {
+  gap: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.sort:hover,
+[aria-sort='ascending'] .sort,
+[aria-sort='descending'] .sort {
+  color: var(--ink);
+}
+
+[aria-sort='ascending'] .sort::after,
+[aria-sort='descending'] .sort::after {
+  margin-left: var(--space-1);
+}
+
+/* The text after the slash is what a screen reader says: nothing, because aria-sort already tells it */
+[aria-sort='ascending'] .sort::after {
+  content: '↑' / '';
+}
+
+[aria-sort='descending'] .sort::after {
+  content: '↓' / '';
+}
+
+th,
+td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.number {
+  text-align: right;
+}
+
+/* The checkbox column: as narrow as its checkbox */
+.check {
+  width: 1%;
+  padding-right: 0;
+}
+
+/* A row that opens something when clicked anywhere */
+tr.clickable {
+  cursor: pointer;
+}
+
+tr.clickable:hover {
+  background: var(--row-hover);
+}
+
+/* The product name in a row: bold text that is still a link, underlined only under the pointer */
+.name {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.name:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  font-variant-numeric: tabular-nums;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+/* A section of a screen: a rounded white card */
+.card {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.card:last-child {
+  margin-bottom: 0;
+}
+
+/* A wide table scrolls sideways inside its card */
+.table-scroll {
+  overflow-x: auto;
+}
+
+/*
+ * The stock scale: 20 graduations, like a stage micrometer.
+ * Set --level to the number of units to fill, from 0 to 20.
+ */
+.scale {
+  --level: 0;
+  display: inline-block;
+  width: 6rem;
+  height: 0.5rem;
+  margin-right: var(--space-2);
+  vertical-align: middle;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(5% - 1px), var(--surface) calc(5% - 1px) 5%),
+    linear-gradient(90deg, var(--accent) calc(var(--level) * 5%), var(--line) 0);
+}
+
+.scale.large {
+  display: block;
+  width: 100%;
+  height: 1rem;
+  margin: var(--space-3) 0;
+}
+
+.reading {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Text */
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.message {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+}
+
+.field .error {
+  font-size: var(--text-sm);
+}
+
+/* Phones: a tighter table, and columns marked .wide are hidden so stock stays in view */
+@media (max-width: 40rem) {
+  th,
+  td {
+    padding-inline: 0.6rem;
+  }
+
+  .wide {
+    display: none;
+  }
+
+  .nowrap {
+    white-space: normal;
+  }
+
+  .scale {
+    width: 4rem;
+  }
+}
+
+/* Actions for the ticked rows of a table: a dark bar fixed at the bottom of the screen */
+/*
+ * Actions for the ticked rows of a table: a dark bar of fixed width at the bottom of the screen area.
+ * It sticks to the bottom of the window while the page scrolls, and stops above the footer at the end.
+ * On a short page, the auto top margin puts it right above the footer.
+ */
+.selection-bar {
+  position: sticky;
+  bottom: var(--space-4);
+  z-index: 10;
+  display: flex;
+  align-self: center;
+  align-items: center;
+  gap: var(--space-3);
+  /* 456 x 52 px, the size of the reference design; its 32 px buttons sit centered in it */
+  width: 28.5rem;
+  max-width: 100%;
+  height: 3.25rem;
+  margin-top: auto;
+  padding: 0 var(--space-2) 0 1.25rem;
+  border-radius: var(--radius-card);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 600;
+}
+
+/* The count on the left; the buttons on the right */
+.selection-bar .count {
+  margin-right: auto;
+}
+
+/* Buttons in the bar are 32 px, the ZEISS button height, so the bar stays low */
+.selection-bar button {
+  min-height: 2rem;
+}
+
+/* At least this much room between the table footer and the bar, when the page leaves none to spare */
+.table-footer:has(+ .selection-bar) {
+  margin-bottom: var(--space-4);
+}
+
+.selection-bar .danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.selection-bar .divider {
+  width: 1px;
+  height: 1.75rem;
+  background: var(--line-on-ink);
+}
+
+.selection-bar .close {
+  width: 2rem;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--surface);
+}
+
+.selection-bar .close:hover {
+  border-color: var(--line-on-ink);
+}
+
+/* The dark focus color would vanish on --ink, so the bar uses a white ring */
+.selection-bar :focus-visible {
+  outline-color: var(--surface);
+}

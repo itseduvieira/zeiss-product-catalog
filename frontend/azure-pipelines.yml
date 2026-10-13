@@ -1,0 +1,36 @@
+# Runs only when something under frontend/ changes on main.
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - frontend
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: UseNode@1
+    inputs:
+      version: 24.x
+
+  - script: npm ci
+    displayName: Install
+    workingDirectory: frontend
+
+  - script: npm test -- --no-watch
+    displayName: Test
+    workingDirectory: frontend
+
+  - script: npm run build:azure
+    displayName: Build
+    workingDirectory: frontend
+
+  # SWA_DEPLOYMENT_TOKEN is a secret pipeline variable. Copy it from the Static Web App: Overview > Manage deployment token.
+  - task: AzureStaticWebApp@0
+    displayName: Deploy
+    inputs:
+      app_location: frontend/dist/product-catalog/browser
+      skip_app_build: true
+      azure_static_web_apps_api_token: $(SWA_DEPLOYMENT_TOKEN)
