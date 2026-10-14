@@ -1,21 +1,29 @@
-import { CurrencyPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Observable, Subject, Subscription, debounceTime, forkJoin, interval, map } from 'rxjs';
-import { Product, ProductService, REFRESH_MS, errorMessage, scaleLevel } from './product.service';
+import { Observable, Subscription, forkJoin, interval } from 'rxjs';
+import {
+  ApiStatus,
+  Confirmation,
+  Product,
+  ProductService,
+  REFRESH_MS,
+  STOCK_STATUSES,
+  StockStatus,
+  errorMessage,
+  isUnreachable,
+  stockStatus,
+} from './product.service';
 
 type SortColumn = 'name' | 'category' | 'price';
 
-interface Sort {
-  column: SortColumn;
-  /** 1 for ascending, -1 for descending */
-  direction: 1 | -1;
-}
+/** A dropdown: the Status filter, the page size, or the actions of the product with this id. */
+type Menu = 'status' | 'page-size' | number;
 
-/** The API's highest allowed stock. A range with no maximum runs up to it. */
+/** The API's highest allowed stock. A stock range with no maximum runs up to it. */
 const MAX_STOCK = 1000000;
 
 const compareBy: Record<SortColumn, (a: Product, b: Product) => number> = {
@@ -24,13 +32,16 @@ const compareBy: Record<SortColumn, (a: Product, b: Product) => number> = {
   price: (a, b) => a.price - b.price,
 };
 
-/** The products as a CSV file: one header row, then one row per product. Values with commas or quotes are quoted. */
+/** Whether a value is within a range. An empty end does not limit it. */
+function inRange(value: number, min: number | null, max: number | null): boolean {
+  return (min === null || value >= min) && (max === null || value <= max);
+}
+
+/** The products as a CSV file: one header row, then one row per product. */
 export function productsCsv(products: Product[]): string {
-  const cell = (value: string | number) => {
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  const header = ['Product number', 'Name', 'Category', 'Price (EUR)', 'Stock'];
+  // Every value is quoted, and quotes inside it are doubled, so commas and quotes in a name are safe.
+  const cell = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+  const header = ['Product number', 'Name', 'Category', 'Price (€)', 'Stock'];
   const rows = products.map((p) => [p.id, p.name, p.categoryName, p.price.toFixed(2), p.stock]);
   return [header, ...rows].map((row) => row.map(cell).join(',')).join('\n');
 }
@@ -38,9 +49,9 @@ export function productsCsv(products: Product[]): string {
 /** Master screen: every product with its stock. A name opens the product's own screen. */
 @Component({
   selector: 'app-product-list',
-  // The page size menu closes on a click outside it or on Escape.
-  host: { '(document:click)': 'closeMenuOutside($event)', '(document:keydown.escape)': 'menuOpen.set(false)' },
-  imports: [CurrencyPipe, FormsModule, RouterLink],
+  // The page size and Status menus close on a click outside them or on Escape.
+  host: { '(document:click)': 'closeMenuOnClickOutside($event)', '(document:keydown.escape)': 'closeMenu()' },
+  imports: [DecimalPipe, FormsModule, RouterLink],
   template: `
     <header class="page-header">
       <div class="row">
@@ -52,34 +63,92 @@ export function productsCsv(products: Product[]): string {
         </span>
         <div class="title">
           <h1>Product catalog</h1>
-          <p class="subtitle">Prices and stock for every product.</p>
+          <p class="subtitle">Manage products and their stock</p>
         </div>
       </div>
       <div class="row">
-        <button type="button" (click)="export()">
+        <button class="icon-only" type="button" aria-label="Export as CSV" data-tooltip="Export as CSV" (click)="export()">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
             <path d="M8 2v8m-3-3 3 3 3-3M3 12v2h10v-2" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
-          Export
         </button>
-        <a class="button primary" routerLink="/products/new">New product</a>
+        <a class="button primary" routerLink="/products/new">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <path d="M8 3v10M3 8h10" stroke-linecap="round" />
+          </svg>
+          New product
+        </a>
       </div>
     </header>
 
-    <div class="row toolbar">
-      <label class="field grow">
-        <span>Name</span>
-        <input type="search" placeholder="Search by name" [(ngModel)]="name" (ngModelChange)="filterChanged()" />
-      </label>
-      <label class="field">
-        <span>Min stock</span>
-        <input class="short" type="number" min="0" [(ngModel)]="min" (ngModelChange)="filterChanged()" />
-      </label>
-      <label class="field">
-        <span>Max stock</span>
-        <input class="short" type="number" min="0" [(ngModel)]="max" (ngModelChange)="filterChanged()" />
-      </label>
+    <div class="toolbar">
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="M10.5 10.5L14 14" stroke-linecap="round" />
+        </svg>
+        <input type="search" aria-label="Search by name, ID or category" placeholder="Search by name, ID or category" [(ngModel)]="searchText" (ngModelChange)="filterChanged()" />
+      </div>
+      <button type="button" [attr.aria-expanded]="filtersOpen()" (click)="filtersOpen.set(!filtersOpen())">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M2 4h12M4.5 8h7M7 12h2" stroke-linecap="round" />
+        </svg>
+        Filters
+        @if (activeFilterCount() > 0) {
+          <span class="badge" [attr.aria-label]="activeFilterCount() + ' active'">{{ activeFilterCount() }}</span>
+        }
+      </button>
     </div>
+
+    @if (filtersOpen()) {
+      <div class="filter-bar">
+        <div class="field">
+          <span id="status-filter">Status</span>
+          <div class="dropdown">
+            <button
+              class="select"
+              type="button"
+              aria-haspopup="true"
+              aria-labelledby="status-filter status-value"
+              [attr.aria-expanded]="openMenu() === 'status'"
+              (click)="toggleMenu('status')"
+            >
+              <span id="status-value">{{ statusSummary() }}</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            @if (openMenu() === 'status') {
+              <div class="menu below" role="group" aria-labelledby="status-filter">
+                @for (status of stockStatuses; track status) {
+                  <label class="option">
+                    <input type="checkbox" [checked]="checkedStatuses().includes(status)" (change)="toggleStatus(status)" />
+                    <span class="status" [attr.data-status]="status">{{ status }}</span>
+                  </label>
+                }
+              </div>
+            }
+          </div>
+        </div>
+        <div class="field" role="group" aria-labelledby="stock-filter">
+          <span id="stock-filter">Stock</span>
+          <div class="row">
+            <input class="short" type="number" min="0" aria-label="Min stock" placeholder="Min" [(ngModel)]="minStock" (ngModelChange)="filterChanged()" />
+            <input class="short" type="number" min="0" aria-label="Max stock" placeholder="Max" [(ngModel)]="maxStock" (ngModelChange)="filterChanged()" />
+          </div>
+        </div>
+        <div class="field" role="group" aria-labelledby="price-filter">
+          <span id="price-filter">Price (€)</span>
+          <div class="row">
+            <input class="short" type="number" min="0" step="0.01" aria-label="Min price (€)" placeholder="Min" [(ngModel)]="minPrice" (ngModelChange)="filterChanged()" />
+            <input class="short" type="number" min="0" step="0.01" aria-label="Max price (€)" placeholder="Max" [(ngModel)]="maxPrice" (ngModelChange)="filterChanged()" />
+          </div>
+        </div>
+        @if (activeFilterCount() > 0) {
+          <button class="link clear-filters" type="button" (click)="clearFilters()">Clear filters</button>
+        }
+      </div>
+    }
 
     @if (error()) {
       <p class="error">{{ error() }} <button type="button" (click)="load()">Try again</button></p>
@@ -87,12 +156,13 @@ export function productsCsv(products: Product[]): string {
 
     @if (loading() && products().length === 0) {
       <p class="muted">Loading products…</p>
-    } @else if (products().length > 0) {
+    } @else if (rows().length > 0) {
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
               <th class="check" aria-label="Select"></th>
+              <th class="wide">ID</th>
               <th [attr.aria-sort]="ariaSort('name')">
                 <button class="sort" type="button" (click)="sortBy('name')">Name</button>
               </th>
@@ -100,32 +170,61 @@ export function productsCsv(products: Product[]): string {
                 <button class="sort" type="button" (click)="sortBy('category')">Category</button>
               </th>
               <th class="number" [attr.aria-sort]="ariaSort('price')">
-                <button class="sort" type="button" (click)="sortBy('price')">Price</button>
+                <button class="sort" type="button" (click)="sortBy('price')">Price (€)</button>
               </th>
               <th>Stock</th>
+              <th class="actions" aria-label="Actions"></th>
             </tr>
           </thead>
           <tbody>
-            @for (product of pageRows(); track product.id) {
-              <tr class="clickable" (click)="openRow($event, product.id)">
+            @for (product of pageRows(); track product.id; let last = $last) {
+              <tr class="clickable" (click)="openProduct($event, product.id)">
                 <td class="check">
                   <input
                     type="checkbox"
                     [attr.aria-label]="'Select ' + product.name"
-                    [checked]="selected().has(product.id)"
-                    (change)="toggle(product.id)"
+                    [checked]="selectedIds().includes(product.id)"
+                    (change)="toggleSelected(product.id)"
                   />
                 </td>
+                <td class="wide muted">{{ product.id }}</td>
                 <td><a class="name" [routerLink]="['/products', product.id]">{{ product.name }}</a></td>
                 <td class="wide">{{ product.categoryName }}</td>
-                <td class="number">{{ product.price | currency: 'EUR' }}</td>
-                <td class="nowrap">
-                  <span class="scale" [style.--level]="scaleLevel(product.stock)"></span>
-                  @if (product.stock === 0) {
-                    <span class="error">Out of stock</span>
-                  } @else {
-                    {{ product.stock }}
-                  }
+                <!-- The heading says €, so a price shows as 2,450.00 -->
+                <td class="number">{{ product.price | number: '1.2-2' }}</td>
+                <td>
+                  <span class="scale" [style.--stock]="product.stock"></span>
+                  <span class="count">{{ product.stock }}</span>
+                  <span class="status" [attr.data-status]="stockStatus(product.stock)">{{ stockStatus(product.stock) }}</span>
+                </td>
+                <td class="actions">
+                  <div class="dropdown">
+                    <button
+                      class="icon-button"
+                      type="button"
+                      aria-haspopup="true"
+                      [attr.aria-label]="'Actions for ' + product.name"
+                      [attr.aria-expanded]="openMenu() === product.id"
+                      (click)="toggleMenu(product.id)"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                        <circle cx="8" cy="3" r="1.25" />
+                        <circle cx="8" cy="8" r="1.25" />
+                        <circle cx="8" cy="13" r="1.25" />
+                      </svg>
+                    </button>
+                    @if (openMenu() === product.id) {
+                      <!-- The last row opens its menu upward, so the menu stays inside the table's scroll box -->
+                      <div class="menu end" [class.below]="!last" role="group" [attr.aria-label]="'Actions for ' + product.name">
+                        <button class="danger" type="button" (click)="deleteProducts([product])">
+                          Delete
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.75 7v4M9.25 7v4" stroke-linecap="round" stroke-linejoin="round" />
+                          </svg>
+                        </button>
+                      </div>
+                    }
+                  </div>
                 </td>
               </tr>
             }
@@ -145,11 +244,11 @@ export function productsCsv(products: Product[]): string {
               <path d="M6 3.5L10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
-          <div class="page-size">
-            <button class="pill" type="button" aria-haspopup="true" [attr.aria-expanded]="menuOpen()" (click)="menuOpen.set(!menuOpen())">
-              {{ firstRow() }}–{{ lastRow() }} of {{ products().length }} products
+          <div class="dropdown">
+            <button class="pill" type="button" aria-haspopup="true" [attr.aria-expanded]="openMenu() === 'page-size'" (click)="toggleMenu('page-size')">
+              {{ pageStart() + 1 }}–{{ pageStart() + pageRows().length }} of {{ rows().length }} products
             </button>
-            @if (menuOpen()) {
+            @if (openMenu() === 'page-size') {
               <div class="menu" role="group" aria-labelledby="page-size-heading">
                 <p id="page-size-heading">Products per page</p>
                 @for (size of pageSizes; track size) {
@@ -172,27 +271,27 @@ export function productsCsv(products: Product[]): string {
       @if (selectedProducts().length > 0) {
         <div class="selection-bar" role="region" aria-label="Selected products">
           <span class="count">{{ selectedProducts().length }} selected</span>
-          <button class="danger" type="button" (click)="deleteSelected()">
+          <button class="danger" type="button" (click)="deleteProducts(selectedProducts())">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.75 7v4M9.25 7v4" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             Delete
           </button>
           <span class="divider"></span>
-          <button class="close" type="button" aria-label="Clear selection" (click)="clearSelection()">
+          <button class="close" type="button" aria-label="Clear selection" (click)="selectedIds.set([])">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round" />
             </svg>
           </button>
         </div>
       }
-    } @else if (!error()) {
+    } @else if (!error() && !api.unreachable()) {
       <div>
-        @if (filtered()) {
-          <p class="muted">No products match your search.</p>
-          <button type="button" (click)="clear()">Clear search</button>
+        @if (hasSearchOrFilters()) {
+          <p class="muted">No products match your search</p>
+          <button type="button" (click)="clearSearchAndFilters()">Clear search</button>
         } @else {
-          <p class="muted">There are no products yet.</p>
+          <p class="muted">There are no products yet</p>
         }
       </div>
     }
@@ -201,182 +300,242 @@ export function productsCsv(products: Product[]): string {
 export class ProductList {
   private readonly service = inject(ProductService);
   private readonly router = inject(Router);
-  private readonly filterChanges = new Subject<void>();
+  protected readonly api = inject(ApiStatus);
+  private readonly confirmation = inject(Confirmation);
   private loadSubscription?: Subscription;
 
-  protected readonly scaleLevel = scaleLevel;
+  protected readonly stockStatus = stockStatus;
+  protected readonly stockStatuses = STOCK_STATUSES;
+  protected readonly pageSizes = [5, 10, 20];
+
+  /** What the API returned for the search text and the stock range. */
   protected readonly products = signal<Product[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly sort = signal<Sort>({ column: 'name', direction: 1 });
-  /** The products in the chosen order. Sorting happens here, because the API has no sort. */
+
+  protected readonly searchText = signal('');
+  protected readonly filtersOpen = signal(false);
+  /** The statuses ticked in the Status dropdown. None ticked shows every status. */
+  protected readonly checkedStatuses = signal<StockStatus[]>([]);
+  protected readonly minStock = signal<number | null>(null);
+  protected readonly maxStock = signal<number | null>(null);
+  protected readonly minPrice = signal<number | null>(null);
+  protected readonly maxPrice = signal<number | null>(null);
+
+  /** The column a heading click sorted by, or null to keep the order the API returns. */
+  protected readonly sortColumn = signal<SortColumn | null>(null);
+  protected readonly sortAscending = signal(true);
+
+  /** The dropdown whose menu is open, if any. */
+  protected readonly openMenu = signal<Menu | null>(null);
+
+  /** The ids of the ticked rows. */
+  protected readonly selectedIds = signal<number[]>([]);
+
+  protected readonly page = signal(1);
+  protected readonly pageSize = signal(10);
+
+  /**
+   * The products to show, in the chosen order. The price range, the statuses, and the sorting happen here, because
+   * the API has no price or status filter and no sort. The stock range is checked here too, for a search with a range.
+   */
   protected readonly rows = computed(() => {
-    const { column, direction } = this.sort();
-    return [...this.products()].sort((a, b) => compareBy[column](a, b) * direction);
+    const statuses = this.checkedStatuses();
+    const rows = this.products().filter(
+      (p) =>
+        inRange(p.price, this.minPrice(), this.maxPrice()) &&
+        inRange(p.stock, this.minStock(), this.maxStock()) &&
+        (statuses.length === 0 || statuses.includes(stockStatus(p.stock))),
+    );
+    const column = this.sortColumn();
+    if (column) {
+      rows.sort(compareBy[column]);
+      if (!this.sortAscending()) {
+        rows.reverse();
+      }
+    }
+    return rows;
   });
 
   // Paging happens here too, because the API returns the whole list.
-  protected readonly pageSizes = [5, 10, 20];
-  protected readonly pageSize = signal(10);
-  protected readonly page = signal(1);
-  protected readonly pageCount = computed(() => Math.max(1, Math.ceil(this.products().length / this.pageSize())));
-  /** The chosen page, or the last one when a search leaves fewer pages. */
+  protected readonly pageCount = computed(() => Math.max(1, Math.ceil(this.rows().length / this.pageSize())));
+  /** The chosen page, or the last one when fewer pages are left, for example after a delete. */
   protected readonly currentPage = computed(() => Math.min(this.page(), this.pageCount()));
-  /** The first and last product on the page, counted from 1, for "1–10 of 12 products". */
-  protected readonly firstRow = computed(() => (this.currentPage() - 1) * this.pageSize() + 1);
-  protected readonly lastRow = computed(() => Math.min(this.currentPage() * this.pageSize(), this.products().length));
-  protected readonly menuOpen = signal(false);
-  protected readonly pageRows = computed(() => {
-    const start = (this.currentPage() - 1) * this.pageSize();
-    return this.rows().slice(start, start + this.pageSize());
-  });
+  /** How many rows come before the current page. */
+  protected readonly pageStart = computed(() => (this.currentPage() - 1) * this.pageSize());
+  protected readonly pageRows = computed(() => this.rows().slice(this.pageStart(), this.pageStart() + this.pageSize()));
 
-  protected name = '';
-  protected min: number | null = null;
-  protected max: number | null = null;
+  /** The ticked products that the filters still show. Actions apply to these only, never to hidden ones. */
+  protected readonly selectedProducts = computed(() => this.rows().filter((p) => this.selectedIds().includes(p.id)));
 
   constructor() {
     this.load();
-    // Searches 300 ms after the last keystroke, so typing a word sends one request.
-    this.filterChanges.pipe(debounceTime(300), takeUntilDestroyed()).subscribe(() => this.load());
     interval(REFRESH_MS)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.load());
   }
 
-  protected filterChanged(): void {
-    this.page.set(1);
-    this.filterChanges.next();
-  }
-
-  /** A click anywhere on a row opens the product. The name link and the checkbox handle their own clicks. */
-  protected openRow(event: MouseEvent, id: number): void {
-    if ((event.target as HTMLElement).closest('a, input')) {
-      return;
-    }
-    this.router.navigate(['/products', id]);
-  }
-
-  /** The ids of the rows whose checkbox is ticked. */
-  protected readonly selected = signal(new Set<number>());
-  /** The ticked products that the filters still show. Actions apply to these only, never to hidden ones. */
-  protected readonly selectedProducts = computed(() => this.rows().filter((p) => this.selected().has(p.id)));
-
-  protected clearSelection(): void {
-    this.selected.set(new Set());
-  }
-
-  /** Deletes the ticked products after a confirmation. The API has no bulk delete, so it sends one request each. */
-  protected deleteSelected(): void {
-    const products = this.selectedProducts();
-    const question = products.length === 1 ? `Delete "${products[0].name}"?` : `Delete ${products.length} products?`;
-    if (!confirm(question)) {
-      return;
-    }
-    forkJoin(products.map((p) => this.service.delete(p.id))).subscribe({
-      next: () => {
-        this.clearSelection();
-        this.load();
-      },
-      error: (error: HttpErrorResponse) => {
-        this.error.set(errorMessage(error));
-        this.load();
-      },
-    });
-  }
-
-  protected toggle(id: number): void {
-    const selected = new Set(this.selected());
-    if (!selected.delete(id)) {
-      selected.add(id);
-    }
-    this.selected.set(selected);
-  }
-
-  /**
-   * Downloads the ticked products, or, with none ticked, every product that matches the filters.
-   * Either way in the table's order and across all pages.
-   */
-  protected export(): void {
-    const products = this.selectedProducts().length > 0 ? this.selectedProducts() : this.rows();
-    // The byte order mark lets Excel read the file as UTF-8.
-    const file = new Blob(['\uFEFF' + productsCsv(products)], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(file);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'products.csv';
-    link.click();
-    URL.revokeObjectURL(url);
-  }
-
-  protected setPageSize(size: number): void {
-    this.pageSize.set(size);
-    this.page.set(1);
-    this.menuOpen.set(false);
-  }
-
-  protected closeMenuOutside(event: MouseEvent): void {
-    if (!(event.target as HTMLElement).closest('.page-size')) {
-      this.menuOpen.set(false);
-    }
-  }
-
-  /** A click on a column heading sorts by it. A second click on the same heading reverses the order. */
-  protected sortBy(column: SortColumn): void {
-    const current = this.sort();
-    const direction = current.column === column ? (current.direction === 1 ? -1 : 1) : 1;
-    this.sort.set({ column, direction });
-    this.page.set(1);
-  }
-
-  protected ariaSort(column: SortColumn): 'ascending' | 'descending' | 'none' {
-    const { column: sorted, direction } = this.sort();
-    if (sorted !== column) {
-      return 'none';
-    }
-    return direction === 1 ? 'ascending' : 'descending';
-  }
-
-  protected filtered(): boolean {
-    return this.name.trim() !== '' || this.min !== null || this.max !== null;
-  }
-
-  protected clear(): void {
-    this.name = '';
-    this.min = null;
-    this.max = null;
-    this.page.set(1);
-    this.load();
-  }
-
   protected load(): void {
     this.loading.set(true);
+    // A new load replaces one still waiting, so a slow older answer never overwrites a newer one.
     this.loadSubscription?.unsubscribe();
     this.loadSubscription = this.request().subscribe({
       next: (products) => {
         this.products.set(products);
         this.error.set(null);
+        this.api.unreachable.set(false);
         this.loading.set(false);
       },
       error: (error: HttpErrorResponse) => {
-        this.error.set(errorMessage(error));
+        // An unreachable API shows in the ribbon under the header; other errors show here.
+        this.api.unreachable.set(isUnreachable(error));
+        this.error.set(isUnreachable(error) ? null : errorMessage(error));
         this.loading.set(false);
       },
     });
   }
 
-  /** Picks the endpoint for what is typed in the search boxes. Empty boxes list everything. */
+  /** Search text goes to the search endpoint, a stock range alone to the stock level endpoint, and nothing to the full list. */
   private request(): Observable<Product[]> {
-    const name = this.name.trim();
-    if (this.min === null && this.max === null) {
-      return name ? this.service.search(name) : this.service.getAll();
+    const text = this.searchText().trim();
+    const min = this.minStock();
+    const max = this.maxStock();
+    if (text) {
+      return this.service.search(text);
     }
-    const inRange = this.service.getByStockLevel(this.min ?? 0, this.max ?? MAX_STOCK);
-    if (!name) {
-      return inRange;
+    if (min !== null || max !== null) {
+      return this.service.getByStockLevel(min ?? 0, max ?? MAX_STOCK);
     }
-    // The API has no query for name and stock together, so the name filters the range result here.
-    const term = name.toLowerCase();
-    return inRange.pipe(map((products) => products.filter((p) => p.name.toLowerCase().includes(term))));
+    return this.service.getAll();
+  }
+
+  /** Any change to the search or the filters goes back to page 1 and asks the API again. */
+  protected filterChanged(): void {
+    this.page.set(1);
+    this.load();
+  }
+
+  /** How many filters behind the Filters button are set. The Status dropdown counts as one, however many are ticked. */
+  protected activeFilterCount(): number {
+    const values = [this.minStock(), this.maxStock(), this.minPrice(), this.maxPrice()];
+    return values.filter((value) => value !== null).length + (this.checkedStatuses().length > 0 ? 1 : 0);
+  }
+
+  protected hasSearchOrFilters(): boolean {
+    return this.searchText().trim() !== '' || this.activeFilterCount() > 0;
+  }
+
+  /** What the Status dropdown shows when closed: All, the one ticked status, or how many are ticked. */
+  protected statusSummary(): string {
+    const checked = this.checkedStatuses();
+    if (checked.length === 0) {
+      return 'All';
+    }
+    return checked.length === 1 ? checked[0] : `${checked.length} selected`;
+  }
+
+  protected toggleStatus(status: StockStatus): void {
+    const checked = this.checkedStatuses();
+    this.checkedStatuses.set(checked.includes(status) ? checked.filter((s) => s !== status) : [...checked, status]);
+    this.filterChanged();
+  }
+
+  /** Clears the filters behind the Filters button. The search text stays. */
+  protected clearFilters(): void {
+    this.checkedStatuses.set([]);
+    this.minStock.set(null);
+    this.maxStock.set(null);
+    this.minPrice.set(null);
+    this.maxPrice.set(null);
+    this.filterChanged();
+  }
+
+  protected clearSearchAndFilters(): void {
+    this.searchText.set('');
+    this.clearFilters();
+  }
+
+  /** A click on a column heading sorts by it. A second click on the same heading reverses the order. */
+  protected sortBy(column: SortColumn): void {
+    if (this.sortColumn() === column) {
+      this.sortAscending.set(!this.sortAscending());
+    } else {
+      this.sortColumn.set(column);
+      this.sortAscending.set(true);
+    }
+    this.page.set(1);
+  }
+
+  protected ariaSort(column: SortColumn): string {
+    if (this.sortColumn() !== column) {
+      return 'none';
+    }
+    return this.sortAscending() ? 'ascending' : 'descending';
+  }
+
+  protected toggleMenu(menu: Menu): void {
+    this.openMenu.set(this.openMenu() === menu ? null : menu);
+  }
+
+  protected closeMenu(): void {
+    this.openMenu.set(null);
+  }
+
+  protected closeMenuOnClickOutside(event: MouseEvent): void {
+    if (!(event.target as HTMLElement).closest('.dropdown')) {
+      this.closeMenu();
+    }
+  }
+
+  protected setPageSize(size: number): void {
+    this.pageSize.set(size);
+    this.page.set(1);
+    this.closeMenu();
+  }
+
+  /** A click anywhere on a row opens the product. The name link, the checkbox, and the actions menu handle their own clicks. */
+  protected openProduct(event: MouseEvent, id: number): void {
+    if ((event.target as HTMLElement).closest('a, input, .dropdown')) {
+      return;
+    }
+    this.router.navigate(['/products', id]);
+  }
+
+  protected toggleSelected(id: number): void {
+    const ids = this.selectedIds();
+    this.selectedIds.set(ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]);
+  }
+
+  /**
+   * Deletes products after a confirmation: one from its row menu, or the ticked ones from the selection bar.
+   * The API has no bulk delete, so it sends one request each.
+   */
+  protected async deleteProducts(products: Product[]): Promise<void> {
+    this.closeMenu();
+    const what = products.length === 1 ? `"${products[0].name}"` : `${products.length} products`;
+    if (!(await this.confirmation.askToDelete(what))) {
+      return;
+    }
+    const ids = products.map((p) => p.id);
+    forkJoin(ids.map((id) => this.service.delete(id))).subscribe({
+      next: () => {
+        // Deleted products are no longer ticked. Other ticks stay.
+        this.selectedIds.set(this.selectedIds().filter((id) => !ids.includes(id)));
+        this.load();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.error.set(errorMessage(error));
+        this.load();
+      },
+    });
+  }
+
+  /** Downloads every product that matches the filters, in the table's order and across all pages. Ticks do not matter. */
+  protected export(): void {
+    const link = document.createElement('a');
+    // The byte order mark at the start lets Excel read the file as UTF-8.
+    link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + productsCsv(this.rows()));
+    link.download = 'products.csv';
+    link.click();
   }
 }

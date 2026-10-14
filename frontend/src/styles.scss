@@ -6,7 +6,7 @@
 :root {
   /* Color, from the ZEISS design tokens on zeiss.com (light theme) */
   --paper: #f5f8fa; /* page background */
-  --surface: #ffffff; /* header, footer, cards, inputs */
+  --surface: #ffffff; /* header, footer, menus, inputs */
   --ink: #32373e; /* text */
   --muted: #606a76; /* secondary text */
   --line: #c2cdd6; /* borders, empty scale */
@@ -15,9 +15,16 @@
   --hover: #0052aa; /* links and the primary button under the pointer */
   --focus: #00346c; /* keyboard focus outline */
   --danger: #b21212; /* errors, out of stock, delete */
+  --ok: #166249; /* In Stock badge text, the ZEISS text-success */
+  --ok-fill: #e5f9f3; /* In Stock badge, the ZEISS background-success_subtle */
+  --warn: #725400; /* Low badge text, the ZEISS text-caution */
+  --warn-fill: #fff4d5; /* Low badge, the ZEISS background-caution_subtle */
+  --critical: #cd4b13; /* Critical badge, the ZEISS badge-background-orange */
   --field-focus: #ecf0f4; /* the fill of a field you are typing in */
   --field-error: #fe7a7a33; /* the red tint of a field with a wrong value */
   --row-hover: #ecf0f4; /* a table row under the pointer, the ZEISS list hover color */
+  --header-fill: #e6ebf0; /* the header row of a table, the ZEISS background-04 */
+  --selected-fill: #eaf7ff; /* a selected button, such as Filters while its row is open, the ZEISS information-10 */
   --line-on-ink: #4e565f; /* borders on --ink, the ZEISS dark theme border-subtle */
 
   /* Type: one family on the ZEISS sizes of 12, 14, 16, 18 and 20 px */
@@ -35,7 +42,7 @@
   --space-4: 1.5rem;
   --space-5: 2.5rem;
   --radius: 3px; /* buttons */
-  --radius-card: 0.75rem; /* cards, 12 px: containers are rounder than the controls inside them */
+  --radius-container: 0.75rem; /* menus and the selection bar, 12 px: containers are rounder than the controls inside them */
   --field: 2.625rem; /* field height, 42 px */
   --page: 60rem;
 }
@@ -140,6 +147,38 @@ footer.bar p {
   display: contents;
 }
 
+/* A thin red strip under the header, end to end, for a problem with the whole app, such as an unreachable API */
+.ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 1.5rem;
+  padding: 0 var(--space-3);
+  background: var(--danger);
+  color: var(--surface);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+/* A button that reads like a link, for an action inside a sentence, such as Try again */
+.link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* The dark focus color would vanish on red, so the ribbon uses a white ring */
+.ribbon :focus-visible {
+  outline-color: var(--surface);
+}
+
 /* The ZEISS logo and the app name in the header, centered on one line */
 .brand {
   display: inline-flex;
@@ -157,11 +196,6 @@ footer.bar p {
   flex-wrap: wrap;
   align-items: stretch;
   gap: var(--space-2);
-}
-
-/* In a .row: .grow takes the free width */
-.grow {
-  flex: 1 1 14rem;
 }
 
 /* The top of a screen: the title and a muted subtitle on the left, the screen's actions on the right */
@@ -208,14 +242,82 @@ footer.bar p {
   color: var(--surface);
 }
 
-/* The filters above a table: labelled fields lined up along their bottom edge */
+/* Above a table: the name search, which takes the width up to the Filters button at the right */
 .toolbar {
-  align-items: flex-end;
-  justify-content: flex-start;
+  display: flex;
+  gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 
-/* Under a table: the total, the page numbers, and the page size */
+/* The Filters button is selected while its row is open: blue border, blue text, a light blue fill */
+.toolbar > button[aria-expanded='true'] {
+  border-color: var(--accent);
+  background: var(--selected-fill);
+  color: var(--link);
+}
+
+/* A search field with a magnifier inside it, on the left */
+.search {
+  position: relative;
+  flex: 1;
+}
+
+.search > input {
+  width: 100%;
+  padding-left: 2.25rem;
+}
+
+.search > svg {
+  position: absolute;
+  top: 50%;
+  left: 0.75rem;
+  color: var(--muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+/*
+ * The filters behind the Filters button, in a row under the search: Status, Stock, and Price.
+ * Each group is a .field with its heading above; its boxes have short placeholders.
+ */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.filter-bar > .field {
+  margin-bottom: 0;
+}
+
+/* Clear filters, at the end of the row, lined up with the boxes */
+.clear-filters {
+  align-self: flex-end;
+  min-height: var(--field);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.toolbar:has(+ .filter-bar) {
+  margin-bottom: var(--space-2);
+}
+
+/* A small round count on a button, such as how many filters are set */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: var(--text-xs);
+}
+
+/* Under a table: the page arrows and the range */
 .table-footer {
   display: flex;
   flex-wrap: wrap;
@@ -224,15 +326,6 @@ footer.bar p {
   gap: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
-}
-
-.toolbar > .field {
-  margin-bottom: 0;
-}
-
-.crumbs {
-  margin-bottom: var(--space-3);
-  font-size: var(--text-sm);
 }
 
 /* Controls */
@@ -269,6 +362,34 @@ button:disabled:hover {
   border-color: var(--line);
 }
 
+/* A square button holding only an icon, as tall as a field. It needs an aria-label, and usually a data-tooltip. */
+.icon-only {
+  width: var(--field);
+  padding: 0;
+}
+
+/* A short label under a control, shown on hover or keyboard focus. The text comes from data-tooltip. */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 50%;
+  z-index: 30;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--surface);
+  font: 500 var(--text-xs) / 1rem var(--font);
+  white-space: nowrap;
+  pointer-events: none;
+  content: attr(data-tooltip);
+  transform: translateX(-50%);
+}
+
 /* A small borderless button holding only an icon, such as the page arrows */
 .icon-button {
   width: 1.75rem;
@@ -294,8 +415,9 @@ button:disabled:hover {
 
 /* A small gray button with a short text, such as "1–10 of 12 products" */
 .pill {
-  min-height: 1.75rem;
+  min-height: 1.5rem;
   padding: 0 var(--space-2);
+  font-size: var(--text-xs);
   border: 0;
   border-radius: 6px;
   background: var(--row-hover);
@@ -304,11 +426,10 @@ button:disabled:hover {
 
 .pill:hover {
   background: var(--field-focus);
-  color: var(--ink);
 }
 
-/* A small list of choices that opens above the button before it */
-.page-size {
+/* A button with a small menu of choices. The menu opens above it, or below it with .below, and lines up with its right edge with .end. */
+.dropdown {
   position: relative;
 }
 
@@ -320,7 +441,7 @@ button:disabled:hover {
   min-width: 10.5rem;
   padding: var(--space-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-container);
   background: var(--surface);
 }
 
@@ -345,6 +466,53 @@ button:disabled:hover {
 
 .menu > button:hover {
   background: var(--row-hover);
+}
+
+.menu.below {
+  top: calc(100% + var(--space-1));
+  bottom: auto;
+}
+
+.menu.end {
+  right: 0;
+  left: auto;
+}
+
+/* A choice with a checkbox, such as a status in the Status dropdown */
+.menu > .option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.menu > .option:hover {
+  background: var(--row-hover);
+}
+
+/* A button that opens a dropdown, drawn like a field: white, an underline, the choice, and a chevron */
+.select {
+  justify-content: space-between;
+  min-width: 10rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--surface);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.select:hover {
+  border-bottom-color: var(--ink);
+}
+
+.select[aria-expanded='true'] {
+  border-bottom-color: var(--focus);
+  background: var(--field-focus);
 }
 
 .primary {
@@ -379,6 +547,7 @@ textarea {
   background: var(--surface);
   color: inherit;
   font: inherit;
+  font-size: var(--text-sm); /* 16 px on phones, see the end of this file */
 }
 
 input:hover,
@@ -433,17 +602,16 @@ input[type='checkbox']:focus-visible {
 }
 
 .field > span {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 500;
 }
 
-/* A number box, such as a quantity or a stock limit */
+/* A number box, such as a stock or price limit */
 .short {
   width: 7rem;
 }
 
 /* Data */
-
 
 table {
   width: 100%;
@@ -451,8 +619,10 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
+/* The header row is a gray band with dark text, so it reads apart from the rows */
 th {
-  color: var(--muted);
+  background: var(--header-fill);
+  color: var(--ink);
   font-size: var(--text-sm);
   font-weight: 500;
   text-align: left;
@@ -460,23 +630,25 @@ th {
 
 /* A column heading that sorts the table. The th's aria-sort decides the arrow. */
 .sort {
+  position: relative;
   gap: 0;
   min-height: 0;
   padding: 0;
   border: 0;
   background: none;
-  color: inherit;
   font: inherit;
+  /* Sortable headings keep the header color and are underlined like links, so they read as clickable */
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
-.sort:hover,
-[aria-sort='ascending'] .sort,
-[aria-sort='descending'] .sort {
-  color: var(--ink);
-}
-
+/* The arrow sits just right of the heading, outside its text, so the underline does not run under it */
 [aria-sort='ascending'] .sort::after,
 [aria-sort='descending'] .sort::after {
+  position: absolute;
+  left: 100%;
   margin-left: var(--space-1);
 }
 
@@ -509,6 +681,12 @@ tbody tr:last-child td {
   padding-right: 0;
 }
 
+/* The row menu column at the end: as narrow as its ⋯ button */
+.actions {
+  width: 1%;
+  padding-left: 0;
+}
+
 /* A row that opens something when clicked anywhere */
 tr.clickable {
   cursor: pointer;
@@ -530,51 +708,68 @@ tr.clickable:hover {
   text-decoration: underline;
 }
 
-.nowrap {
-  white-space: nowrap;
-}
-
-.facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: var(--space-3);
-  margin: 0 0 var(--space-5);
-  font-variant-numeric: tabular-nums;
-}
-
-.facts dt {
-  color: var(--muted);
-  font-size: var(--text-sm);
-}
-
-.facts dd {
-  margin: 0;
-}
-
-/* A section of a screen: a rounded white card */
-.card {
+/* A part of a screen under its page header, with an h2 heading, such as Stock and Details on a product */
+.section {
   margin-bottom: var(--space-5);
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: var(--surface);
 }
 
-.card:last-child {
+.section:last-child {
   margin-bottom: 0;
 }
 
-/* A wide table scrolls sideways inside its card */
+/* A wide table scrolls sideways inside its box */
 .table-scroll {
   overflow-x: auto;
 }
 
 /*
+ * A stock badge: In Stock, Low, Critical, or Out of Stock. data-status, set to the badge text, picks the color.
+ * In Stock and Low are tinted; Critical and Out of Stock are solid, so they stand out.
+ */
+.status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem var(--space-2);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1rem;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.status[data-status='In Stock'] {
+  background: var(--ok-fill);
+  color: var(--ok);
+}
+
+.status[data-status='Low'] {
+  background: var(--warn-fill);
+  color: var(--warn);
+}
+
+.status[data-status='Critical'] {
+  background: var(--critical);
+  color: var(--surface);
+}
+
+.status[data-status='Out of Stock'] {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+/* The stock count before its badge, wide enough that the badges line up */
+.count {
+  display: inline-block;
+  min-width: 2.5rem;
+}
+
+/*
  * The stock scale: 20 graduations, like a stage micrometer.
- * Set --level to the number of units to fill, from 0 to 20.
+ * Set --stock to the stock count. Each unit fills one graduation, so 20 or more fills the scale.
  */
 .scale {
-  --level: 0;
+  --stock: 0;
   display: inline-block;
   width: 6rem;
   height: 0.5rem;
@@ -582,18 +777,42 @@ tr.clickable:hover {
   vertical-align: middle;
   background:
     repeating-linear-gradient(90deg, transparent 0 calc(5% - 1px), var(--surface) calc(5% - 1px) 5%),
-    linear-gradient(90deg, var(--accent) calc(var(--level) * 5%), var(--line) 0);
+    linear-gradient(90deg, var(--accent) calc(min(var(--stock), 20) * 5%), var(--line) 0);
 }
 
-.scale.large {
-  display: block;
-  width: 100%;
-  height: 1rem;
-  margin: var(--space-3) 0;
+/*
+ * The stock controls on a product: a − and a + icon button around the quantity box, all 32 px tall,
+ * the ZEISS small button height. The box hides the browser's own arrows, since − and + sit beside it.
+ */
+.stock-controls {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.stock-controls > * {
+  min-height: 2rem;
+  height: 2rem;
+}
+
+.stock-controls > .icon-only {
+  width: 2rem;
+}
+
+.stock-controls > input {
+  width: 3.5rem;
+  padding-block: 0;
+  text-align: center;
+  appearance: textfield;
+}
+
+.stock-controls > input::-webkit-inner-spin-button,
+.stock-controls > input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 .reading {
-  margin: 0;
+  margin: 0 0 var(--space-3);
   font-size: var(--text-lg);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -614,6 +833,25 @@ tr.clickable:hover {
   font-size: var(--text-sm);
 }
 
+/* Beside Save changes while the form has changes that are not saved: a --warn dot and text */
+.unsaved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: var(--space-2);
+  color: var(--warn);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.unsaved::before {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
 .field .error {
   font-size: var(--text-sm);
 }
@@ -629,16 +867,19 @@ tr.clickable:hover {
     display: none;
   }
 
-  .nowrap {
-    white-space: normal;
-  }
-
   .scale {
     width: 4rem;
   }
+
+  /* Safari on iPhone zooms the page into a field with text under 16 px, so fields keep 16 px here */
+  input,
+  select,
+  textarea,
+  .select {
+    font-size: var(--text-md);
+  }
 }
 
-/* Actions for the ticked rows of a table: a dark bar fixed at the bottom of the screen */
 /*
  * Actions for the ticked rows of a table: a dark bar of fixed width at the bottom of the screen area.
  * It sticks to the bottom of the window while the page scrolls, and stops above the footer at the end.
@@ -658,7 +899,7 @@ tr.clickable:hover {
   height: 3.25rem;
   margin-top: auto;
   padding: 0 var(--space-2) 0 1.25rem;
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-container);
   background: var(--ink);
   color: var(--surface);
   font-weight: 600;
@@ -679,10 +920,41 @@ tr.clickable:hover {
   margin-bottom: var(--space-4);
 }
 
-.selection-bar .danger {
+/* Delete in the selection bar and in the delete dialog is solid red */
+.selection-bar .danger,
+dialog .danger {
   border-color: var(--danger);
   background: var(--danger);
   color: var(--surface);
+}
+
+/* The delete dialog: a white box in the middle of the screen, over the page dimmed with --ink */
+dialog {
+  width: min(26rem, 100% - 2 * var(--space-3));
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-container);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+dialog::backdrop {
+  background: rgb(50 55 62 / 0.5);
+}
+
+dialog h2 {
+  margin-bottom: var(--space-2);
+}
+
+dialog p {
+  margin-bottom: var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+/* Cancel and Delete at the right, Delete last */
+dialog .row {
+  justify-content: flex-end;
 }
 
 .selection-bar .divider {

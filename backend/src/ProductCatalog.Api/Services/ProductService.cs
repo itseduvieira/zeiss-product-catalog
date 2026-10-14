@@ -53,9 +53,12 @@ public sealed class ProductService : IProductService
                 $"Name filter cannot be longer than {ProductRules.NameMaxLength} characters.");
         }
 
+        // The text matches part of the name, the category name, or the product number.
         var lowered = term.ToLowerInvariant();
         var products = await Query()
-            .Where(p => p.Name.ToLower().Contains(lowered))
+            .Where(p => p.Name.ToLower().Contains(lowered)
+                || p.Category.Name.ToLower().Contains(lowered)
+                || p.Id.ToString().Contains(term))
             .OrderBy(p => p.Id)
             .ToListAsync(cancellationToken);
 

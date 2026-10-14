@@ -1,8 +1,9 @@
-import { TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { ProductList, productsCsv } from './product-list';
-import { Product, ProductService } from './product.service';
+import { ApiStatus, Confirmation, Product, ProductService } from './product.service';
 
 const products: Product[] = [
   {
@@ -29,12 +30,23 @@ const products: Product[] = [
   },
 ];
 
+/** Twelve products, so the table has two pages of 10. */
+const twelveProducts = Array.from({ length: 12 }, (_, i) => ({
+  ...products[0],
+  id: 200001 + i,
+  name: `Product ${String(i + 1).padStart(2, '0')}`,
+}));
+
 describe('ProductList', () => {
   const service = {
     getAll: vi.fn(() => of(products)),
     search: vi.fn(() => of([products[0]])),
     getByStockLevel: vi.fn(() => of([products[1]])),
+    delete: vi.fn(() => of(undefined)),
   };
+
+  let fixture: ComponentFixture<ProductList>;
+  let page: HTMLElement;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -45,238 +57,306 @@ describe('ProductList', () => {
   });
 
   async function render() {
-    const fixture = TestBed.createComponent(ProductList);
+    fixture = TestBed.createComponent(ProductList);
+    page = fixture.nativeElement;
     await fixture.whenStable();
-    return fixture;
   }
 
-  /** Types into the box with this visible label, then waits out the 300 ms pause before the search runs. */
-  async function type(fixture: Awaited<ReturnType<typeof render>>, label: string, value: string) {
-    const labels = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('label'));
-    const input = labels.find((l) => l.querySelector('span')?.textContent === label)!.querySelector('input')!;
+  /** Types into the box with this accessible name. */
+  async function type(label: string, value: string) {
+    const input = page.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
     input.value = value;
     input.dispatchEvent(new Event('input'));
-    await new Promise((resolve) => setTimeout(resolve, 350));
     await fixture.whenStable();
   }
 
-  function names(fixture: Awaited<ReturnType<typeof render>>) {
-    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr');
-    return Array.from(rows).map((row) => row.querySelector('a')?.textContent);
+  async function click(element: HTMLElement) {
+    element.click();
+    await fixture.whenStable();
   }
 
-  it('lists each product by name, with a link to its screen and its stock', async () => {
-    const fixture = await render();
-    const rows = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr');
+  function button(text: string) {
+    return Array.from(page.querySelectorAll('button')).find((b) => b.textContent?.trim() === text);
+  }
 
-    expect(names(fixture)).toEqual(['LED illuminator', 'Primo Star']);
-    expect(rows[0].textContent).toContain('Out of stock');
-    expect(rows[1].querySelector('a')?.getAttribute('href')).toBe('/products/100001');
-    expect(rows[1].textContent).toContain('6');
+  function names() {
+    return Array.from(page.querySelectorAll('tbody tr')).map((row) => row.querySelector('a')?.textContent);
+  }
+
+  async function openFilters() {
+    await click(Array.from(page.querySelectorAll('button')).find((b) => b.textContent?.includes('Filters'))!);
+  }
+
+  async function tickAllRows() {
+    page.querySelectorAll<HTMLInputElement>('tbody input[type=checkbox]').forEach((box) => box.click());
+    await fixture.whenStable();
+  }
+
+  /** Clicks the export button and returns the text of the file it downloads. */
+  function exportCsv() {
+    const linkClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    page.querySelector<HTMLButtonElement>('button[aria-label="Export as CSV"]')!.click();
+    const link = linkClick.mock.contexts[0] as HTMLAnchorElement;
+    const href = link.getAttribute('href')!;
+    return { fileName: link.download, text: decodeURIComponent(href.slice(href.indexOf(',') + 1)) };
+  }
+
+  it('lists each product in the order the API sends, with a link to its screen and its stock', async () => {
+    await render();
+    const rows = page.querySelectorAll('tbody tr');
+
+    expect(names()).toEqual(['Primo Star', 'LED illuminator']);
+    expect(rows[0].querySelector('.scale')?.getAttribute('style')).toContain('--stock: 6');
+    expect(rows[0].querySelector('a')?.getAttribute('href')).toBe('/products/100001');
+    expect(rows[1].querySelector('.status')?.textContent?.trim()).toBe('Out of Stock');
+    expect(rows[0].querySelector('td.number')?.textContent?.trim()).toBe('2,450.00');
   });
 
-  it('searches by name while typing, without a button', async () => {
-    const fixture = await render();
+  it('searches while typing, without a button', async () => {
+    await render();
 
-    await type(fixture, 'Name', 'primo');
+    await type('Search by name, ID or category', 'primo');
 
     expect(service.search).toHaveBeenCalledWith('primo');
-    expect(names(fixture)).toEqual(['Primo Star']);
+    expect(names()).toEqual(['Primo Star']);
   });
 
-  it('uses the stock range endpoint, open-ended up to the API maximum, and filters it by name', async () => {
-    const fixture = await render();
+  it('keeps the stock and price filters hidden until Filters is pressed', async () => {
+    await render();
 
-    await type(fixture, 'Min stock', '0');
-    await type(fixture, 'Name', 'led');
+    expect(page.querySelector('input[aria-label="Min stock"]')).toBeNull();
+    await openFilters();
+    expect(page.querySelector('input[aria-label="Min stock"]')).not.toBeNull();
+    expect(page.querySelector('input[aria-label="Max price (€)"]')).not.toBeNull();
+  });
+
+  it('uses the stock range endpoint for a range alone, open-ended up to the API maximum', async () => {
+    await render();
+
+    await openFilters();
+    await type('Min stock', '0');
 
     expect(service.getByStockLevel).toHaveBeenLastCalledWith(0, 1000000);
-    expect(service.search).not.toHaveBeenCalled();
-    expect(names(fixture)).toEqual(['LED illuminator']);
+    expect(names()).toEqual(['LED illuminator']);
+  });
+
+  it('uses the search endpoint for search text with a stock range, and keeps the products in the range', async () => {
+    await render();
+    service.search.mockReturnValueOnce(of(products));
+
+    await openFilters();
+    await type('Min stock', '1');
+    await type('Search by name, ID or category', 'r');
+
+    expect(service.search).toHaveBeenLastCalledWith('r');
+    expect(names()).toEqual(['Primo Star']);
   });
 
   it('shows 10 products a page, with arrows and the range below the table', async () => {
-    const many = Array.from({ length: 12 }, (_, i) => ({
-      ...products[0],
-      id: 200001 + i,
-      name: `Product ${String(i + 1).padStart(2, '0')}`,
-    }));
-    service.getAll.mockReturnValueOnce(of(many));
-    const fixture = await render();
-    const page = fixture.nativeElement as HTMLElement;
+    service.getAll.mockReturnValueOnce(of(twelveProducts));
+    await render();
     const pill = () => page.querySelector('.pill')!.textContent!.trim();
 
-    expect(names(fixture).length).toBe(10);
+    expect(names().length).toBe(10);
     expect(pill()).toBe('1–10 of 12 products');
 
-    page.querySelector<HTMLButtonElement>('button[aria-label="Next page"]')!.click();
-    await fixture.whenStable();
+    await click(page.querySelector<HTMLButtonElement>('button[aria-label="Next page"]')!);
 
-    expect(names(fixture)).toEqual(['Product 11', 'Product 12']);
+    expect(names()).toEqual(['Product 11', 'Product 12']);
     expect(pill()).toBe('11–12 of 12 products');
   });
 
   it('changes the page size from the menu behind the range', async () => {
-    const many = Array.from({ length: 12 }, (_, i) => ({ ...products[0], id: 200001 + i, name: `Product ${i}` }));
-    service.getAll.mockReturnValueOnce(of(many));
-    const fixture = await render();
-    const page = fixture.nativeElement as HTMLElement;
+    service.getAll.mockReturnValueOnce(of(twelveProducts));
+    await render();
 
-    page.querySelector<HTMLButtonElement>('.pill')!.click();
-    await fixture.whenStable();
+    await click(page.querySelector<HTMLButtonElement>('.pill')!);
     expect(page.querySelector('.menu')?.textContent).toContain('Products per page');
 
-    Array.from(page.querySelectorAll<HTMLButtonElement>('.menu button')).find((b) => b.textContent?.trim() === '5')!.click();
-    await fixture.whenStable();
+    await click(Array.from(page.querySelectorAll<HTMLButtonElement>('.menu button')).find((b) => b.textContent?.trim() === '5')!);
 
-    expect(names(fixture).length).toBe(5);
+    expect(names().length).toBe(5);
     expect(page.querySelector('.pill')!.textContent!.trim()).toBe('1–5 of 12 products');
     expect(page.querySelector('.menu')).toBeNull();
   });
 
+  it('filters by a price range in the app, and counts the active filters on the Filters button', async () => {
+    await render();
+
+    await openFilters();
+    await type('Min price (€)', '1000');
+
+    expect(names()).toEqual(['Primo Star']);
+    expect(page.querySelector('.badge')?.textContent?.trim()).toBe('1');
+  });
+
+  it('filters by the statuses ticked in the Status dropdown', async () => {
+    await render();
+
+    await openFilters();
+    const dropdown = page.querySelector<HTMLButtonElement>('.filter-bar .select')!;
+    expect(dropdown.textContent?.trim()).toBe('All');
+
+    await click(dropdown);
+    const option = (label: string) =>
+      Array.from(page.querySelectorAll('.menu .option')).find((o) => o.textContent?.trim() === label)!.querySelector('input')!;
+    await click(option('Out of Stock'));
+
+    expect(names()).toEqual(['LED illuminator']);
+    expect(dropdown.textContent?.trim()).toBe('Out of Stock');
+
+    await click(option('Low'));
+
+    expect(names()).toEqual(['Primo Star', 'LED illuminator']);
+    expect(dropdown.textContent?.trim()).toBe('2 selected');
+    expect(page.querySelector('.badge')?.textContent?.trim()).toBe('1');
+  });
+
+  it('shows Clear filters only while a filter is set, and it clears them all', async () => {
+    await render();
+
+    await openFilters();
+    expect(button('Clear filters')).toBeUndefined();
+
+    await type('Min price (€)', '1000');
+    expect(names()).toEqual(['Primo Star']);
+
+    await click(button('Clear filters')!);
+
+    expect(names()).toEqual(['Primo Star', 'LED illuminator']);
+    expect(button('Clear filters')).toBeUndefined();
+    expect(page.querySelector('.badge')).toBeNull();
+  });
+
   it('sorts by a column heading, and reverses on a second click', async () => {
-    const fixture = await render();
-    const page = fixture.nativeElement as HTMLElement;
-    const heading = (label: string) =>
-      Array.from(page.querySelectorAll('th')).find((th) => th.textContent?.trim() === label)!;
+    await render();
+    const heading = (label: string) => Array.from(page.querySelectorAll('th')).find((th) => th.textContent?.trim() === label)!;
 
-    expect(heading('Name').getAttribute('aria-sort')).toBe('ascending');
-
-    heading('Price').querySelector('button')!.click();
-    await fixture.whenStable();
-    expect(names(fixture)).toEqual(['LED illuminator', 'Primo Star']);
-    expect(heading('Price').getAttribute('aria-sort')).toBe('ascending');
+    // Nothing is sorted until a heading is clicked.
     expect(heading('Name').getAttribute('aria-sort')).toBe('none');
 
-    heading('Price').querySelector('button')!.click();
-    await fixture.whenStable();
-    expect(names(fixture)).toEqual(['Primo Star', 'LED illuminator']);
-    expect(heading('Price').getAttribute('aria-sort')).toBe('descending');
+    await click(heading('Price (€)').querySelector('button')!);
+    expect(names()).toEqual(['LED illuminator', 'Primo Star']);
+    expect(heading('Price (€)').getAttribute('aria-sort')).toBe('ascending');
+    expect(heading('Name').getAttribute('aria-sort')).toBe('none');
+
+    await click(heading('Price (€)').querySelector('button')!);
+    expect(names()).toEqual(['Primo Star', 'LED illuminator']);
+    expect(heading('Price (€)').getAttribute('aria-sort')).toBe('descending');
   });
 
   it('exports the products as a CSV file named products.csv', async () => {
-    const createObjectURL = vi.fn((_blob: Blob) => 'blob:products');
-    URL.createObjectURL = createObjectURL;
-    URL.revokeObjectURL = vi.fn();
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    const page = (await render()).nativeElement as HTMLElement;
+    await render();
 
-    Array.from(page.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Export')!.click();
+    const { fileName, text } = exportCsv();
 
-    const link = click.mock.contexts[0] as HTMLAnchorElement;
-    expect(link.download).toBe('products.csv');
-    const text = await createObjectURL.mock.calls[0][0].text();
-    expect(text).toContain('Product number,Name,Category,Price (EUR),Stock');
-    expect(text).toContain('100001,Primo Star,Microscopes,2450.00,6');
-  });
-});
-
-describe('ProductList rows', () => {
-  const service = { getAll: vi.fn(() => of(products)), delete: vi.fn(() => of(undefined)) };
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    await TestBed.configureTestingModule({
-      imports: [ProductList],
-      providers: [provideRouter([]), { provide: ProductService, useValue: service }],
-    }).compileComponents();
+    expect(fileName).toBe('products.csv');
+    expect(text).toContain('"Product number","Name","Category","Price (€)","Stock"');
+    expect(text).toContain('"100001","Primo Star","Microscopes","2450.00","6"');
   });
 
-  async function render() {
-    const fixture = TestBed.createComponent(ProductList);
-    await fixture.whenStable();
-    return fixture;
-  }
+  it('exports every product, even when some rows are ticked', async () => {
+    await render();
+
+    await click(page.querySelectorAll('tbody tr')[1].querySelector<HTMLInputElement>('input[type=checkbox]')!);
+    const { text } = exportCsv();
+
+    expect(text.trim().split('\n').length).toBe(3);
+  });
 
   it('opens the product when a row is clicked anywhere but its checkbox', async () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    const fixture = await render();
-    const row = (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr')[1];
+    await render();
+    const row = page.querySelectorAll('tbody tr')[0];
 
     row.querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
     expect(navigate).not.toHaveBeenCalled();
 
-    (row.querySelector('td.wide') as HTMLElement).click();
+    row.querySelector<HTMLElement>('td.wide')!.click();
     expect(navigate).toHaveBeenCalledWith(['/products', 100001]);
   });
 
-  it('exports only the ticked rows when any are ticked', async () => {
-    const createObjectURL = vi.fn((_blob: Blob) => 'blob:products');
-    URL.createObjectURL = createObjectURL;
-    URL.revokeObjectURL = vi.fn();
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    const fixture = await render();
-    const page = fixture.nativeElement as HTMLElement;
+  it('deletes one product from the ⋯ menu on its row, after a confirmation, without opening it', async () => {
+    const ask = vi.spyOn(TestBed.inject(Confirmation), 'askToDelete').mockResolvedValue(true);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    await render();
 
-    page.querySelectorAll('tbody tr')[1].querySelector<HTMLInputElement>('input[type=checkbox]')!.click();
-    await fixture.whenStable();
-    Array.from(page.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Export')!.click();
+    await click(page.querySelector<HTMLButtonElement>('button[aria-label="Actions for Primo Star"]')!);
+    await click(page.querySelector<HTMLButtonElement>('.menu button.danger')!);
 
-    const lines = (await createObjectURL.mock.calls[0][0].text()).trim().split('\n');
-    expect(lines.length).toBe(2);
-    expect(lines[1]).toBe('100001,Primo Star,Microscopes,2450.00,6');
-  });
-});
-
-describe('ProductList selection bar', () => {
-  const service = { getAll: vi.fn(() => of(products)), delete: vi.fn(() => of(undefined)) };
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    await TestBed.configureTestingModule({
-      imports: [ProductList],
-      providers: [provideRouter([]), { provide: ProductService, useValue: service }],
-    }).compileComponents();
+    expect(ask).toHaveBeenCalledWith('"Primo Star"');
+    expect(service.delete).toHaveBeenCalledTimes(1);
+    expect(service.delete).toHaveBeenCalledWith(100001);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(page.querySelector('.menu')).toBeNull();
   });
 
-  async function renderWithBothTicked() {
-    const fixture = TestBed.createComponent(ProductList);
-    await fixture.whenStable();
-    const page = fixture.nativeElement as HTMLElement;
-    page.querySelectorAll<HTMLInputElement>('tbody input[type=checkbox]').forEach((box) => box.click());
-    await fixture.whenStable();
-    return { fixture, page, bar: () => page.querySelector('.selection-bar') };
-  }
+  it('opens the row menu below a row, and above the last row', async () => {
+    await render();
 
-  it('appears with the count only while rows are ticked, and the close button clears it', async () => {
-    const { fixture, page, bar } = await renderWithBothTicked();
+    await click(page.querySelector<HTMLButtonElement>('button[aria-label="Actions for Primo Star"]')!);
+    expect(page.querySelector('.menu')?.classList).toContain('below');
 
-    expect(bar()?.textContent).toContain('2 selected');
+    await click(page.querySelector<HTMLButtonElement>('button[aria-label="Actions for LED illuminator"]')!);
+    expect(page.querySelectorAll('.menu').length).toBe(1);
+    expect(page.querySelector('.menu')?.classList).not.toContain('below');
+  });
 
-    page.querySelector<HTMLButtonElement>('button[aria-label="Clear selection"]')!.click();
-    await fixture.whenStable();
+  it('shows the selection bar with the count only while rows are ticked, and its close button clears the ticks', async () => {
+    await render();
+    await tickAllRows();
 
-    expect(bar()).toBeNull();
+    expect(page.querySelector('.selection-bar')?.textContent).toContain('2 selected');
+
+    await click(page.querySelector<HTMLButtonElement>('button[aria-label="Clear selection"]')!);
+
+    expect(page.querySelector('.selection-bar')).toBeNull();
     expect(page.querySelectorAll('tbody input[type=checkbox]:checked').length).toBe(0);
   });
 
   it('deletes every ticked product after a confirmation', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const { fixture, bar } = await renderWithBothTicked();
+    const ask = vi.spyOn(TestBed.inject(Confirmation), 'askToDelete').mockResolvedValue(true);
+    await render();
+    await tickAllRows();
 
-    bar()!.querySelector<HTMLButtonElement>('button.danger')!.click();
-    await fixture.whenStable();
+    await click(page.querySelector<HTMLButtonElement>('.selection-bar button.danger')!);
 
-    expect(confirm).toHaveBeenCalledWith('Delete 2 products?');
-    expect(service.delete).toHaveBeenCalledWith(100007);
+    expect(ask).toHaveBeenCalledWith('2 products');
     expect(service.delete).toHaveBeenCalledWith(100001);
-    expect(bar()).toBeNull();
+    expect(service.delete).toHaveBeenCalledWith(100007);
+    expect(page.querySelector('.selection-bar')).toBeNull();
   });
 
   it('deletes nothing when the user cancels', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
-    const { bar } = await renderWithBothTicked();
+    vi.spyOn(TestBed.inject(Confirmation), 'askToDelete').mockResolvedValue(false);
+    await render();
+    await tickAllRows();
 
-    bar()!.querySelector<HTMLButtonElement>('button.danger')!.click();
+    await click(page.querySelector<HTMLButtonElement>('.selection-bar button.danger')!);
 
     expect(service.delete).not.toHaveBeenCalled();
+  });
+
+  it('turns on the ribbon instead of an inline message when the API cannot be reached, until a load succeeds', async () => {
+    service.getAll.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 0 })));
+    await render();
+    const api = TestBed.inject(ApiStatus);
+
+    expect(api.unreachable()).toBe(true);
+    expect(page.querySelector('.error')).toBeNull();
+    expect(page.textContent).not.toContain('There are no products yet');
+
+    await type('Search by name, ID or category', 'primo');
+
+    expect(api.unreachable()).toBe(false);
+    expect(names()).toEqual(['Primo Star']);
   });
 });
 
 describe('productsCsv', () => {
-  it('quotes values that contain commas or quotes', () => {
+  it('quotes every value, and doubles the quotes inside one', () => {
     const csv = productsCsv([{ ...products[0], name: 'Lens, "large"' }]);
 
-    expect(csv.split('\n')[1]).toBe('100001,"Lens, ""large""",Microscopes,2450.00,6');
+    expect(csv.split('\n')[1]).toBe('"100001","Lens, ""large""","Microscopes","2450.00","6"');
   });
 });

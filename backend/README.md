@@ -134,7 +134,7 @@ curl -s -D - -X POST http://localhost:5158/api/products/100007/decrement-stock/1
 | `/api/products/{id}`                            | DELETE | Delete the product. Status 204.                                           |
 | `/api/products/{id}/decrement-stock/{quantity}` | POST   | Subtract `quantity` from stock. Status 409 when stock is too low.         |
 | `/api/products/{id}/add-to-stock/{quantity}`    | POST   | Add `quantity` to stock. Status 409 when the result would exceed 1000000. |
-| `/api/products/search?name={name}`              | GET    | Case-insensitive partial match on the name.                               |
+| `/api/products/search?name={name}`              | GET    | Case-insensitive partial match on the name, the category name, or the product number. |
 | `/api/products/stock-level?min={min}&max={max}` | GET    | Products whose stock is from `min` through `max`, inclusive.              |
 | `/api/categories`                               | GET    | The seed categories. Use one of these ids when you create a product.      |
 

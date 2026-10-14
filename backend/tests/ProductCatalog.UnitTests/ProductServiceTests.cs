@@ -162,6 +162,19 @@ public class ProductServiceTests
     }
 
     [Fact]
+    public async Task Search_also_matches_the_category_and_the_product_number()
+    {
+        await using var db = new TestDb();
+        var service = CreateService(db.Db);
+
+        var optics = await service.SearchByNameAsync("OPTICS");
+        Assert.Equal(["Axiocam 208 color", "Plan-Apochromat 20x", "Eyepiece 10x/23"], optics.Select(p => p.Name).ToArray());
+
+        var byNumber = await service.SearchByNameAsync("100005");
+        Assert.Equal(["Stage micrometer"], byNumber.Select(p => p.Name).ToArray());
+    }
+
+    [Fact]
     public async Task Stock_range_is_inclusive()
     {
         await using var db = new TestDb();

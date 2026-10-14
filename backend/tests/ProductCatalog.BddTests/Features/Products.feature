@@ -71,6 +71,14 @@ Feature: Product catalog
     And the list contains "Primo Star"
     And the list does not contain "Stemi 305"
 
+  Scenario: Searching also matches the category and the product number
+    When I search products by name "optics"
+    Then the response status is 200
+    And the list contains "Plan-Apochromat 20x"
+    And the list does not contain "Primo Star"
+    When I search products by name "100005"
+    Then the list contains "Stage micrometer"
+
   Scenario: Stock level bounds are inclusive
     When I ask for products with stock between 2 and 4
     Then the response status is 200
