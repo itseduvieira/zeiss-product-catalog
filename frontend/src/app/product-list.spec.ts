@@ -30,7 +30,6 @@ const products: Product[] = [
   },
 ];
 
-/** Twelve products, so the table has two pages of 10. */
 const twelveProducts = Array.from({ length: 12 }, (_, i) => ({
   ...products[0],
   id: 200001 + i,
@@ -62,7 +61,6 @@ describe('ProductList', () => {
     await fixture.whenStable();
   }
 
-  /** Types into the box with this accessible name. */
   async function type(label: string, value: string) {
     const input = page.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
     input.value = value;
@@ -92,7 +90,6 @@ describe('ProductList', () => {
     await fixture.whenStable();
   }
 
-  /** Clicks the export button and returns the text of the file it downloads. */
   function exportCsv() {
     const linkClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     page.querySelector<HTMLButtonElement>('button[aria-label="Export as CSV"]')!.click();
@@ -109,7 +106,7 @@ describe('ProductList', () => {
     expect(rows[0].querySelector('.scale')?.getAttribute('style')).toContain('--stock: 6');
     expect(rows[0].querySelector('a')?.getAttribute('href')).toBe('/products/100001');
     expect(rows[1].querySelector('.status')?.textContent?.trim()).toBe('Out of Stock');
-    expect(rows[0].querySelector('td.number')?.textContent?.trim()).toBe('2,450.00');
+    expect(rows[0].querySelector('td.number')?.textContent?.trim()).toBe('2.450,00');
   });
 
   it('searches while typing, without a button', async () => {
@@ -232,7 +229,6 @@ describe('ProductList', () => {
     await render();
     const heading = (label: string) => Array.from(page.querySelectorAll('th')).find((th) => th.textContent?.trim() === label)!;
 
-    // Nothing is sorted until a heading is clicked.
     expect(heading('Name').getAttribute('aria-sort')).toBe('none');
 
     await click(heading('Price (€)').querySelector('button')!);
@@ -252,7 +248,7 @@ describe('ProductList', () => {
 
     expect(fileName).toBe('products.csv');
     expect(text).toContain('"Product number","Name","Category","Price (€)","Stock"');
-    expect(text).toContain('"100001","Primo Star","Microscopes","2450.00","6"');
+    expect(text).toContain('"100001","Primo Star","Microscopes","2.450,00","6"');
   });
 
   it('exports every product, even when some rows are ticked', async () => {
@@ -357,6 +353,6 @@ describe('productsCsv', () => {
   it('quotes every value, and doubles the quotes inside one', () => {
     const csv = productsCsv([{ ...products[0], name: 'Lens, "large"' }]);
 
-    expect(csv.split('\n')[1]).toBe('"100001","Lens, ""large""","Microscopes","2450.00","6"');
+    expect(csv.split('\n')[1]).toBe('"100001","Lens, ""large""","Microscopes","2.450,00","6"');
   });
 });

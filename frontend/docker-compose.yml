@@ -1,4 +1,3 @@
-# Starts the frontend and, through the include, the API it talks to.
 include:
   - ../backend/docker-compose.yml
 

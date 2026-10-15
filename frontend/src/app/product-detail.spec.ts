@@ -43,7 +43,6 @@ describe('ProductDetail', () => {
     return fixture;
   }
 
-  /** Opens the ⋮ menu in the header and presses Delete in it. */
   async function deleteFromMenu(fixture: Awaited<ReturnType<typeof render>>) {
     const page = fixture.nativeElement as HTMLElement;
     page.querySelector<HTMLButtonElement>('button[aria-label="Actions for Primo Star"]')!.click();
@@ -86,7 +85,7 @@ describe('ProductDetail', () => {
     const fixture = await render('100001');
     const page = fixture.nativeElement as HTMLElement;
 
-    expect(page.querySelector<HTMLInputElement>('input[formcontrolname="price"]')?.value).toBe('2,450.00');
+    expect(page.querySelector<HTMLInputElement>('input[formcontrolname="price"]')?.value).toBe('2.450,00');
 
     button(page, 'Save changes').click();
     await fixture.whenStable();
@@ -100,7 +99,6 @@ describe('ProductDetail', () => {
     });
   });
 
-  /** Types into a form field, the way a person does. */
   async function typeInto(fixture: Awaited<ReturnType<typeof render>>, control: string, value: string) {
     const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>(`[formcontrolname="${control}"]`)!;
     input.value = value;
@@ -109,12 +107,12 @@ describe('ProductDetail', () => {
     return input;
   }
 
-  it('masks the price while typing, as 0,000.00', async () => {
+  it('masks the price while typing, as 0.000,00', async () => {
     const fixture = await render('100001');
 
-    expect((await typeInto(fixture, 'price', '2')).value).toBe('0.02');
-    expect((await typeInto(fixture, 'price', '245000')).value).toBe('2,450.00');
-    expect((await typeInto(fixture, 'price', '2,450.0')).value).toBe('245.00');
+    expect((await typeInto(fixture, 'price', '2')).value).toBe('0,02');
+    expect((await typeInto(fixture, 'price', '245000')).value).toBe('2.450,00');
+    expect((await typeInto(fixture, 'price', '2.450,0')).value).toBe('245,00');
   });
 
   it('shows Unsaved changes after a change, and asks before leaving', async () => {
@@ -138,14 +136,13 @@ describe('ProductDetail', () => {
     const page = fixture.nativeElement as HTMLElement;
 
     await typeInto(fixture, 'name', 'Primo Star HD');
-    expect((await typeInto(fixture, 'price', '2,450.001')).value).toBe('24,500.01');
+    expect((await typeInto(fixture, 'price', '2.450,001')).value).toBe('24.500,01');
     expect(page.querySelector('.unsaved')).not.toBeNull();
 
     await typeInto(fixture, 'name', 'Primo Star');
     expect(page.querySelector('.unsaved')).not.toBeNull();
 
-    // Back to the saved 2,450.00 with Backspace, which takes the extra digit off
-    expect((await typeInto(fixture, 'price', '24,500.0')).value).toBe('2,450.00');
+    expect((await typeInto(fixture, 'price', '24.500,0')).value).toBe('2.450,00');
 
     expect(page.querySelector('.unsaved')).toBeNull();
     expect(fixture.componentInstance.canLeave()).toBe(true);
@@ -221,11 +218,11 @@ describe('ProductDetail', () => {
 });
 
 describe('maskPrice', () => {
-  it('reads the digits as cents and shows them as 0,000.00', () => {
+  it('reads the digits as cents and shows them as 0.000,00', () => {
     expect(maskPrice('')).toBe('');
-    expect(maskPrice('7')).toBe('0.07');
-    expect(maskPrice('1234567')).toBe('12,345.67');
-    expect(maskPrice('12a3')).toBe('1.23');
-    expect(maskPrice('0.005')).toBe('0.05');
+    expect(maskPrice('7')).toBe('0,07');
+    expect(maskPrice('1234567')).toBe('12.345,67');
+    expect(maskPrice('12a3')).toBe('1,23');
+    expect(maskPrice('0,005')).toBe('0,05');
   });
 });

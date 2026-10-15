@@ -1,33 +1,26 @@
-/*
- * Product Catalog design system. Tokens first, then the few elements and classes the app uses.
- * Components have no styles of their own; everything they need is here.
- */
-
 :root {
-  /* Color, from the ZEISS design tokens on zeiss.com (light theme) */
-  --paper: #f5f8fa; /* page background */
-  --surface: #ffffff; /* header, footer, menus, inputs */
-  --ink: #32373e; /* text */
-  --muted: #606a76; /* secondary text */
-  --line: #c2cdd6; /* borders, empty scale */
-  --accent: #0072ef; /* fills you can act on: primary button, filled scale */
-  --link: #0065d1; /* link text, darker than --accent so it stays readable on --paper */
-  --hover: #0052aa; /* links and the primary button under the pointer */
-  --focus: #00346c; /* keyboard focus outline */
-  --danger: #b21212; /* errors, out of stock, delete */
-  --ok: #166249; /* In Stock badge text, the ZEISS text-success */
-  --ok-fill: #e5f9f3; /* In Stock badge, the ZEISS background-success_subtle */
-  --warn: #725400; /* Low badge text, the ZEISS text-caution */
-  --warn-fill: #fff4d5; /* Low badge, the ZEISS background-caution_subtle */
-  --critical: #cd4b13; /* Critical badge, the ZEISS badge-background-orange */
-  --field-focus: #ecf0f4; /* the fill of a field you are typing in */
-  --field-error: #fe7a7a33; /* the red tint of a field with a wrong value */
-  --row-hover: #ecf0f4; /* a table row under the pointer, the ZEISS list hover color */
-  --header-fill: #e6ebf0; /* the header row of a table, the ZEISS background-04 */
-  --selected-fill: #eaf7ff; /* a selected button, such as Filters while its row is open, the ZEISS information-10 */
-  --line-on-ink: #4e565f; /* borders on --ink, the ZEISS dark theme border-subtle */
+  --paper: #f5f8fa;
+  --surface: #ffffff;
+  --ink: #32373e;
+  --muted: #606a76;
+  --line: #c2cdd6;
+  --accent: #0072ef;
+  --link: #0065d1;
+  --hover: #0052aa;
+  --focus: #00346c;
+  --danger: #b21212;
+  --ok: #166249;
+  --ok-fill: #e5f9f3;
+  --warn: #725400;
+  --warn-fill: #fff4d5;
+  --critical: #cd4b13;
+  --field-focus: #ecf0f4;
+  --field-error: #fe7a7a33;
+  --row-hover: #ecf0f4;
+  --header-fill: #e6ebf0;
+  --selected-fill: #eaf7ff;
+  --line-on-ink: #4e565f;
 
-  /* Type: one family on the ZEISS sizes of 12, 14, 16, 18 and 20 px */
   --font: 'Instrument Sans', system-ui, sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
@@ -35,19 +28,16 @@
   --text-lg: 1.125rem;
   --text-xl: 1.25rem;
 
-  /* Space and shape */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 1rem;
   --space-4: 1.5rem;
   --space-5: 2.5rem;
-  --radius: 3px; /* buttons */
-  --radius-container: 0.75rem; /* menus and the selection bar, 12 px: containers are rounder than the controls inside them */
-  --field: 2.625rem; /* field height, 42 px */
+  --radius: 3px;
+  --radius-container: 0.75rem;
+  --field: 2.625rem;
   --page: 60rem;
 }
-
-/* Base */
 
 * {
   box-sizing: border-box;
@@ -94,8 +84,6 @@ a:hover {
   outline-offset: 2px;
 }
 
-/* Layout: header, main and footer share one centered column */
-
 app-root {
   display: flex;
   flex-direction: column;
@@ -132,10 +120,6 @@ footer.bar p {
   margin: 0;
 }
 
-/*
- * The screen area is a column that fills the space between header and footer.
- * The routed screen lays its parts out directly in that column, so a part can sit at its bottom.
- */
 .page {
   display: flex;
   flex-direction: column;
@@ -147,7 +131,6 @@ footer.bar p {
   display: contents;
 }
 
-/* A thin red strip under the header, end to end, for a problem with the whole app, such as an unreachable API */
 .ribbon {
   display: flex;
   align-items: center;
@@ -162,7 +145,6 @@ footer.bar p {
   line-height: 1.25;
 }
 
-/* A button that reads like a link, for an action inside a sentence, such as Try again */
 .link {
   min-height: 0;
   padding: 0;
@@ -174,12 +156,10 @@ footer.bar p {
   text-underline-offset: 0.2em;
 }
 
-/* The dark focus color would vanish on red, so the ribbon uses a white ring */
 .ribbon :focus-visible {
   outline-color: var(--surface);
 }
 
-/* The ZEISS logo and the app name in the header, centered on one line */
 .brand {
   display: inline-flex;
   align-items: center;
@@ -190,7 +170,6 @@ footer.bar p {
   text-decoration: none;
 }
 
-/* Items in a wrapping line, all as tall as the tallest, so buttons line up with inputs */
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -198,7 +177,6 @@ footer.bar p {
   gap: var(--space-2);
 }
 
-/* The top of a screen: the title and a muted subtitle on the left, the screen's actions on the right */
 .page-header {
   display: flex;
   flex-wrap: wrap;
@@ -208,10 +186,6 @@ footer.bar p {
   margin-bottom: var(--space-5);
 }
 
-/*
- * The title and subtitle, exactly as tall as the buttons beside them, so the row lines up.
- * A 24 px title line and a 16 px subtitle line fill the 42 px with 2 px between them.
- */
 .title {
   display: flex;
   flex-direction: column;
@@ -229,7 +203,6 @@ footer.bar p {
   line-height: 1rem;
 }
 
-/* A dark square with a white icon, placed before a title and as tall as it */
 .icon-tile {
   display: inline-flex;
   flex: none;
@@ -242,21 +215,18 @@ footer.bar p {
   color: var(--surface);
 }
 
-/* Above a table: the name search, which takes the width up to the Filters button at the right */
 .toolbar {
   display: flex;
   gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 
-/* The Filters button is selected while its row is open: blue border, blue text, a light blue fill */
 .toolbar > button[aria-expanded='true'] {
   border-color: var(--accent);
   background: var(--selected-fill);
   color: var(--link);
 }
 
-/* A search field with a magnifier inside it, on the left */
 .search {
   position: relative;
   flex: 1;
@@ -276,10 +246,6 @@ footer.bar p {
   transform: translateY(-50%);
 }
 
-/*
- * The filters behind the Filters button, in a row under the search: Status, Stock, and Price.
- * Each group is a .field with its heading above; its boxes have short placeholders.
- */
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -291,7 +257,6 @@ footer.bar p {
   margin-bottom: 0;
 }
 
-/* Clear filters, at the end of the row, lined up with the boxes */
 .clear-filters {
   align-self: flex-end;
   min-height: var(--field);
@@ -303,7 +268,6 @@ footer.bar p {
   margin-bottom: var(--space-2);
 }
 
-/* A small round count on a button, such as how many filters are set */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -317,7 +281,6 @@ footer.bar p {
   font-size: var(--text-xs);
 }
 
-/* Under a table: the page arrows and the range */
 .table-footer {
   display: flex;
   flex-wrap: wrap;
@@ -328,15 +291,12 @@ footer.bar p {
   border-top: 1px solid var(--line);
 }
 
-/* Controls */
-
-/* Buttons are as tall as fields, so the two line up in any row */
 button,
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2); /* between an icon and the text */
+  gap: var(--space-2);
   min-height: var(--field);
   padding: 0 0.9rem;
   border: 1px solid var(--line);
@@ -362,13 +322,11 @@ button:disabled:hover {
   border-color: var(--line);
 }
 
-/* A square button holding only an icon, as tall as a field. It needs an aria-label, and usually a data-tooltip. */
 .icon-only {
   width: var(--field);
   padding: 0;
 }
 
-/* A short label under a control, shown on hover or keyboard focus. The text comes from data-tooltip. */
 [data-tooltip] {
   position: relative;
 }
@@ -390,7 +348,6 @@ button:disabled:hover {
   transform: translateX(-50%);
 }
 
-/* A small borderless button holding only an icon, such as the page arrows */
 .icon-button {
   width: 1.75rem;
   min-height: 1.75rem;
@@ -406,14 +363,12 @@ button:disabled:hover {
   color: var(--ink);
 }
 
-/* The page arrows and the range under a table, kept small */
 .pager {
   display: flex;
   align-items: center;
   gap: var(--space-1);
 }
 
-/* A small gray button with a short text, such as "1–10 of 12 products" */
 .pill {
   min-height: 1.5rem;
   padding: 0 var(--space-2);
@@ -428,7 +383,6 @@ button:disabled:hover {
   background: var(--field-focus);
 }
 
-/* A button with a small menu of choices. The menu opens above it, or below it with .below, and lines up with its right edge with .end. */
 .dropdown {
   position: relative;
 }
@@ -478,7 +432,6 @@ button:disabled:hover {
   left: auto;
 }
 
-/* A choice with a checkbox, such as a status in the Status dropdown */
 .menu > .option {
   display: flex;
   align-items: center;
@@ -493,7 +446,6 @@ button:disabled:hover {
   background: var(--row-hover);
 }
 
-/* A button that opens a dropdown, drawn like a field: white, an underline, the choice, and a chevron */
 .select {
   justify-content: space-between;
   min-width: 10rem;
@@ -535,7 +487,6 @@ button:disabled:hover {
   border-color: var(--danger);
 }
 
-/* Fields follow the ZEISS sign-in page: a white field with a line under it, no box */
 input,
 select,
 textarea {
@@ -547,7 +498,7 @@ textarea {
   background: var(--surface);
   color: inherit;
   font: inherit;
-  font-size: var(--text-sm); /* 16 px on phones, see the end of this file */
+  font-size: var(--text-sm);
 }
 
 input:hover,
@@ -556,7 +507,6 @@ textarea:hover {
   border-bottom-color: var(--ink);
 }
 
-/* A focused field shows its fill and a --focus underline, without the outline ring that buttons and links get */
 input:focus,
 select:focus,
 textarea:focus {
@@ -565,7 +515,6 @@ textarea:focus {
   background: var(--field-focus);
 }
 
-/* Angular marks a field ng-invalid and ng-touched once the user has left it with a wrong value */
 input.ng-invalid.ng-touched,
 select.ng-invalid.ng-touched,
 textarea.ng-invalid.ng-touched {
@@ -606,12 +555,9 @@ input[type='checkbox']:focus-visible {
   font-weight: 500;
 }
 
-/* A number box, such as a stock or price limit */
 .short {
   width: 7rem;
 }
-
-/* Data */
 
 table {
   width: 100%;
@@ -619,7 +565,6 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
-/* The header row is a gray band with dark text, so it reads apart from the rows */
 th {
   background: var(--header-fill);
   color: var(--ink);
@@ -628,7 +573,6 @@ th {
   text-align: left;
 }
 
-/* A column heading that sorts the table. The th's aria-sort decides the arrow. */
 .sort {
   position: relative;
   gap: 0;
@@ -637,14 +581,12 @@ th {
   border: 0;
   background: none;
   font: inherit;
-  /* Sortable headings keep the header color and are underlined like links, so they read as clickable */
   color: inherit;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;
 }
 
-/* The arrow sits just right of the heading, outside its text, so the underline does not run under it */
 [aria-sort='ascending'] .sort::after,
 [aria-sort='descending'] .sort::after {
   position: absolute;
@@ -652,7 +594,6 @@ th {
   margin-left: var(--space-1);
 }
 
-/* The text after the slash is what a screen reader says: nothing, because aria-sort already tells it */
 [aria-sort='ascending'] .sort::after {
   content: '↑' / '';
 }
@@ -675,19 +616,16 @@ tbody tr:last-child td {
   text-align: right;
 }
 
-/* The checkbox column: as narrow as its checkbox */
 .check {
   width: 1%;
   padding-right: 0;
 }
 
-/* The row menu column at the end: as narrow as its ⋯ button */
 .actions {
   width: 1%;
   padding-left: 0;
 }
 
-/* A row that opens something when clicked anywhere */
 tr.clickable {
   cursor: pointer;
 }
@@ -696,7 +634,6 @@ tr.clickable:hover {
   background: var(--row-hover);
 }
 
-/* The product name in a row: bold text that is still a link, underlined only under the pointer */
 .name {
   color: var(--ink);
   font-weight: 600;
@@ -708,7 +645,6 @@ tr.clickable:hover {
   text-decoration: underline;
 }
 
-/* A part of a screen under its page header, with an h2 heading, such as Stock and Details on a product */
 .section {
   margin-bottom: var(--space-5);
 }
@@ -717,15 +653,10 @@ tr.clickable:hover {
   margin-bottom: 0;
 }
 
-/* A wide table scrolls sideways inside its box */
 .table-scroll {
   overflow-x: auto;
 }
 
-/*
- * A stock badge: In Stock, Low, Critical, or Out of Stock. data-status, set to the badge text, picks the color.
- * In Stock and Low are tinted; Critical and Out of Stock are solid, so they stand out.
- */
 .status {
   display: inline-flex;
   align-items: center;
@@ -758,16 +689,11 @@ tr.clickable:hover {
   color: var(--surface);
 }
 
-/* The stock count before its badge, wide enough that the badges line up */
 .count {
   display: inline-block;
   min-width: 2.5rem;
 }
 
-/*
- * The stock scale: 20 graduations, like a stage micrometer.
- * Set --stock to the stock count. Each unit fills one graduation, so 20 or more fills the scale.
- */
 .scale {
   --stock: 0;
   display: inline-block;
@@ -780,10 +706,6 @@ tr.clickable:hover {
     linear-gradient(90deg, var(--accent) calc(min(var(--stock), 20) * 5%), var(--line) 0);
 }
 
-/*
- * The stock controls on a product: a − and a + icon button around the quantity box, all 32 px tall,
- * the ZEISS small button height. The box hides the browser's own arrows, since − and + sit beside it.
- */
 .stock-controls {
   display: flex;
   gap: var(--space-1);
@@ -818,8 +740,6 @@ tr.clickable:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Text */
-
 .muted {
   color: var(--muted);
 }
@@ -833,7 +753,6 @@ tr.clickable:hover {
   font-size: var(--text-sm);
 }
 
-/* Beside Save changes while the form has changes that are not saved: a --warn dot and text */
 .unsaved {
   display: inline-flex;
   align-items: center;
@@ -856,7 +775,6 @@ tr.clickable:hover {
   font-size: var(--text-sm);
 }
 
-/* Phones: a tighter table, and columns marked .wide are hidden so stock stays in view */
 @media (max-width: 40rem) {
   th,
   td {
@@ -871,7 +789,6 @@ tr.clickable:hover {
     width: 4rem;
   }
 
-  /* Safari on iPhone zooms the page into a field with text under 16 px, so fields keep 16 px here */
   input,
   select,
   textarea,
@@ -880,11 +797,6 @@ tr.clickable:hover {
   }
 }
 
-/*
- * Actions for the ticked rows of a table: a dark bar of fixed width at the bottom of the screen area.
- * It sticks to the bottom of the window while the page scrolls, and stops above the footer at the end.
- * On a short page, the auto top margin puts it right above the footer.
- */
 .selection-bar {
   position: sticky;
   bottom: var(--space-4);
@@ -893,7 +805,6 @@ tr.clickable:hover {
   align-self: center;
   align-items: center;
   gap: var(--space-3);
-  /* 456 x 52 px, the size of the reference design; its 32 px buttons sit centered in it */
   width: 28.5rem;
   max-width: 100%;
   height: 3.25rem;
@@ -905,22 +816,18 @@ tr.clickable:hover {
   font-weight: 600;
 }
 
-/* The count on the left; the buttons on the right */
 .selection-bar .count {
   margin-right: auto;
 }
 
-/* Buttons in the bar are 32 px, the ZEISS button height, so the bar stays low */
 .selection-bar button {
   min-height: 2rem;
 }
 
-/* At least this much room between the table footer and the bar, when the page leaves none to spare */
 .table-footer:has(+ .selection-bar) {
   margin-bottom: var(--space-4);
 }
 
-/* Delete in the selection bar and in the delete dialog is solid red */
 .selection-bar .danger,
 dialog .danger {
   border-color: var(--danger);
@@ -928,7 +835,6 @@ dialog .danger {
   color: var(--surface);
 }
 
-/* The delete dialog: a white box in the middle of the screen, over the page dimmed with --ink */
 dialog {
   width: min(26rem, 100% - 2 * var(--space-3));
   padding: var(--space-4);
@@ -952,7 +858,6 @@ dialog p {
   font-size: var(--text-sm);
 }
 
-/* Cancel and Delete at the right, Delete last */
 dialog .row {
   justify-content: flex-end;
 }
@@ -975,7 +880,6 @@ dialog .row {
   border-color: var(--line-on-ink);
 }
 
-/* The dark focus color would vanish on --ink, so the bar uses a white ring */
 .selection-bar :focus-visible {
   outline-color: var(--surface);
 }

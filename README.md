@@ -16,5 +16,6 @@ The apps talk only over HTTP, so each one runs, tests, and deploys on its own. B
 - [`backend/`](backend/README.md) holds the API. To run it, see [Installation](backend/README.md#installation). For its endpoints, see [API reference](backend/README.md#api-reference). For its structure, see [Architecture](backend/README.md#architecture).
 - [`frontend/`](frontend/README.md) holds the Angular app. To run it, see [Installation](frontend/README.md#installation). For its pages, see [Pages](frontend/README.md#pages). For its structure, see [Architecture](frontend/README.md#architecture).
 - `deploy/k8s/` holds the Kubernetes manifests for both apps.
+- `.vscode/` runs both apps from VS Code: choose **API**, **App**, or **API + App** in Run and Debug.
 
 Each README ends with **Room for improvement**, the next steps for that app.

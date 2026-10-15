@@ -41,6 +41,8 @@ npm start
 
 The app is at [http://localhost:4200](http://localhost:4200). The dev server forwards every `/api` request to `http://localhost:5158`, as set in `proxy.conf.json`. The browser sees one origin, so the API needs no CORS setup.
 
+In VS Code, open the repository folder and choose **App** in Run and Debug: it starts the dev server and opens Chrome. **API + App** starts both.
+
 Run the tests, and build for production into `dist/`:
 
 ```bash
@@ -133,7 +135,7 @@ Form rules. They mirror the API's validation, so most mistakes are caught before
 
 - **Name:** required, at most 120 characters.
 - **Description:** optional, at most 2000 characters.
-- **Price (€):** above 0 and at most 1,000,000. The field has a 0,000.00 mask that fills from the right, like a till.
+- **Price (€):** above 0 and at most 1.000.000,00. Prices show as 2.450,00, and the field has a 0.000,00 mask that fills from the right, like a till.
 - **Starting stock:** a whole number from 0 through 1,000,000. Only on New product. After that, stock changes only through − and +.
 - **Category:** required.
 

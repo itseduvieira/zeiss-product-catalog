@@ -14,7 +14,6 @@ export interface Product {
   updatedAt: string;
 }
 
-/** The body for create and update. */
 export interface ProductInput {
   name: string;
   description: string | null;
@@ -29,14 +28,20 @@ export interface Category {
   description: string;
 }
 
-/** How often a screen asks the API again, so changes made elsewhere show up. */
 export const REFRESH_MS = 15000;
 
-/** How full a product's stock is. It is the badge text, and styles.scss picks the badge color from it. */
 export type StockStatus = 'In Stock' | 'Low' | 'Critical' | 'Out of Stock';
 
-/** The statuses in the order the Status filter lists them. */
 export const STOCK_STATUSES: StockStatus[] = ['In Stock', 'Low', 'Critical', 'Out of Stock'];
+
+export function formatPrice(price: number): string {
+  const [euros, cents] = price.toFixed(2).split('.');
+  const groups: string[] = [];
+  for (let end = euros.length; end > 0; end -= 3) {
+    groups.unshift(euros.slice(Math.max(0, end - 3), end));
+  }
+  return `${groups.join('.')},${cents}`;
+}
 
 export function stockStatus(stock: number): StockStatus {
   if (stock === 0) {
@@ -97,30 +102,22 @@ export class ProductService {
   }
 }
 
-/** Whether the API answers. The screens set it, and the frame shows a red ribbon under the header while it is true. */
 @Injectable({ providedIn: 'root' })
 export class ApiStatus {
   readonly unreachable = signal(false);
 }
 
-/** A question for the confirmation dialog: its title, one line under it, and the label of the red button. */
 export interface Question {
   title: string;
   text: string;
   action: string;
 }
 
-/**
- * Asks the user to confirm in a dialog, such as before a delete. A screen awaits the answer;
- * the frame shows the dialog and calls answer() with the button the user pressed.
- */
 @Injectable({ providedIn: 'root' })
 export class Confirmation {
-  /** The open question, or null while the dialog is closed. */
   readonly question = signal<Question | null>(null);
   private resolve?: (confirmed: boolean) => void;
 
-  /** "what" is the product name in quotes, or a count such as 2 products. */
   askToDelete(what: string): Promise<boolean> {
     return this.ask({ title: `Delete ${what}?`, text: 'This cannot be undone', action: 'Delete' });
   }
@@ -141,14 +138,11 @@ export class Confirmation {
   }
 }
 
-/** No answer from the API: status 0 in a browser, or 502, 503, or 504 from a proxy, without problem details. */
 export function isUnreachable(error: HttpErrorResponse): boolean {
   return [0, 502, 503, 504].includes(error.status) && !error.error?.detail && !error.error?.errors;
 }
 
-/** Turns a failed API call into text for the user. */
 export function errorMessage(error: HttpErrorResponse): string {
-  // The API sends field errors as { errors: { field: ["message"] } }, and other errors as { detail }.
   const fieldErrors = error.error?.errors as Record<string, string[]> | undefined;
   if (fieldErrors) {
     return Object.values(fieldErrors).flat().join(' ');

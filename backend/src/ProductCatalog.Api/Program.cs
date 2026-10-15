@@ -16,7 +16,6 @@ builder.Services.AddScoped<IProductIdGenerator, ProductIdGenerator>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
 
-// Browser origins that may call the API, such as the frontend on Azure Static Web Apps. Empty by default.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
     policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));

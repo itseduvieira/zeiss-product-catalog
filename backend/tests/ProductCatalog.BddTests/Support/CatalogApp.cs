@@ -11,7 +11,6 @@ namespace ProductCatalog.BddTests.Support;
 
 public sealed class CatalogApp : WebApplicationFactory<Program>
 {
-    /// <summary>The one browser origin the test host allows through CORS.</summary>
     public const string AllowedOrigin = "https://frontend.example";
 
     public static CatalogApp Current { get; private set; } = null!;

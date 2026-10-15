@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -14,16 +13,15 @@ import {
   STOCK_STATUSES,
   StockStatus,
   errorMessage,
+  formatPrice,
   isUnreachable,
   stockStatus,
 } from './product.service';
 
 type SortColumn = 'name' | 'category' | 'price';
 
-/** A dropdown: the Status filter, the page size, or the actions of the product with this id. */
 type Menu = 'status' | 'page-size' | number;
 
-/** The API's highest allowed stock. A stock range with no maximum runs up to it. */
 const MAX_STOCK = 1000000;
 
 const compareBy: Record<SortColumn, (a: Product, b: Product) => number> = {
@@ -32,26 +30,21 @@ const compareBy: Record<SortColumn, (a: Product, b: Product) => number> = {
   price: (a, b) => a.price - b.price,
 };
 
-/** Whether a value is within a range. An empty end does not limit it. */
 function inRange(value: number, min: number | null, max: number | null): boolean {
   return (min === null || value >= min) && (max === null || value <= max);
 }
 
-/** The products as a CSV file: one header row, then one row per product. */
 export function productsCsv(products: Product[]): string {
-  // Every value is quoted, and quotes inside it are doubled, so commas and quotes in a name are safe.
   const cell = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
   const header = ['Product number', 'Name', 'Category', 'Price (€)', 'Stock'];
-  const rows = products.map((p) => [p.id, p.name, p.categoryName, p.price.toFixed(2), p.stock]);
+  const rows = products.map((p) => [p.id, p.name, p.categoryName, formatPrice(p.price), p.stock]);
   return [header, ...rows].map((row) => row.map(cell).join(',')).join('\n');
 }
 
-/** Master screen: every product with its stock. A name opens the product's own screen. */
 @Component({
   selector: 'app-product-list',
-  // The page size and Status menus close on a click outside them or on Escape.
   host: { '(document:click)': 'closeMenuOnClickOutside($event)', '(document:keydown.escape)': 'closeMenu()' },
-  imports: [DecimalPipe, FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink],
   template: `
     <header class="page-header">
       <div class="row">
@@ -190,8 +183,7 @@ export function productsCsv(products: Product[]): string {
                 <td class="wide muted">{{ product.id }}</td>
                 <td><a class="name" [routerLink]="['/products', product.id]">{{ product.name }}</a></td>
                 <td class="wide">{{ product.categoryName }}</td>
-                <!-- The heading says €, so a price shows as 2,450.00 -->
-                <td class="number">{{ product.price | number: '1.2-2' }}</td>
+                <td class="number">{{ formatPrice(product.price) }}</td>
                 <td>
                   <span class="scale" [style.--stock]="product.stock"></span>
                   <span class="count">{{ product.stock }}</span>
@@ -214,7 +206,6 @@ export function productsCsv(products: Product[]): string {
                       </svg>
                     </button>
                     @if (openMenu() === product.id) {
-                      <!-- The last row opens its menu upward, so the menu stays inside the table's scroll box -->
                       <div class="menu end" [class.below]="!last" role="group" [attr.aria-label]="'Actions for ' + product.name">
                         <button class="danger" type="button" (click)="deleteProducts([product])">
                           Delete
@@ -305,40 +296,32 @@ export class ProductList {
   private loadSubscription?: Subscription;
 
   protected readonly stockStatus = stockStatus;
+  protected readonly formatPrice = formatPrice;
   protected readonly stockStatuses = STOCK_STATUSES;
   protected readonly pageSizes = [5, 10, 20];
 
-  /** What the API returned for the search text and the stock range. */
   protected readonly products = signal<Product[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
 
   protected readonly searchText = signal('');
   protected readonly filtersOpen = signal(false);
-  /** The statuses ticked in the Status dropdown. None ticked shows every status. */
   protected readonly checkedStatuses = signal<StockStatus[]>([]);
   protected readonly minStock = signal<number | null>(null);
   protected readonly maxStock = signal<number | null>(null);
   protected readonly minPrice = signal<number | null>(null);
   protected readonly maxPrice = signal<number | null>(null);
 
-  /** The column a heading click sorted by, or null to keep the order the API returns. */
   protected readonly sortColumn = signal<SortColumn | null>(null);
   protected readonly sortAscending = signal(true);
 
-  /** The dropdown whose menu is open, if any. */
   protected readonly openMenu = signal<Menu | null>(null);
 
-  /** The ids of the ticked rows. */
   protected readonly selectedIds = signal<number[]>([]);
 
   protected readonly page = signal(1);
   protected readonly pageSize = signal(10);
 
-  /**
-   * The products to show, in the chosen order. The price range, the statuses, and the sorting happen here, because
-   * the API has no price or status filter and no sort. The stock range is checked here too, for a search with a range.
-   */
   protected readonly rows = computed(() => {
     const statuses = this.checkedStatuses();
     const rows = this.products().filter(
@@ -357,15 +340,11 @@ export class ProductList {
     return rows;
   });
 
-  // Paging happens here too, because the API returns the whole list.
   protected readonly pageCount = computed(() => Math.max(1, Math.ceil(this.rows().length / this.pageSize())));
-  /** The chosen page, or the last one when fewer pages are left, for example after a delete. */
   protected readonly currentPage = computed(() => Math.min(this.page(), this.pageCount()));
-  /** How many rows come before the current page. */
   protected readonly pageStart = computed(() => (this.currentPage() - 1) * this.pageSize());
   protected readonly pageRows = computed(() => this.rows().slice(this.pageStart(), this.pageStart() + this.pageSize()));
 
-  /** The ticked products that the filters still show. Actions apply to these only, never to hidden ones. */
   protected readonly selectedProducts = computed(() => this.rows().filter((p) => this.selectedIds().includes(p.id)));
 
   constructor() {
@@ -377,7 +356,6 @@ export class ProductList {
 
   protected load(): void {
     this.loading.set(true);
-    // A new load replaces one still waiting, so a slow older answer never overwrites a newer one.
     this.loadSubscription?.unsubscribe();
     this.loadSubscription = this.request().subscribe({
       next: (products) => {
@@ -387,7 +365,6 @@ export class ProductList {
         this.loading.set(false);
       },
       error: (error: HttpErrorResponse) => {
-        // An unreachable API shows in the ribbon under the header; other errors show here.
         this.api.unreachable.set(isUnreachable(error));
         this.error.set(isUnreachable(error) ? null : errorMessage(error));
         this.loading.set(false);
@@ -395,7 +372,6 @@ export class ProductList {
     });
   }
 
-  /** Search text goes to the search endpoint, a stock range alone to the stock level endpoint, and nothing to the full list. */
   private request(): Observable<Product[]> {
     const text = this.searchText().trim();
     const min = this.minStock();
@@ -409,13 +385,11 @@ export class ProductList {
     return this.service.getAll();
   }
 
-  /** Any change to the search or the filters goes back to page 1 and asks the API again. */
   protected filterChanged(): void {
     this.page.set(1);
     this.load();
   }
 
-  /** How many filters behind the Filters button are set. The Status dropdown counts as one, however many are ticked. */
   protected activeFilterCount(): number {
     const values = [this.minStock(), this.maxStock(), this.minPrice(), this.maxPrice()];
     return values.filter((value) => value !== null).length + (this.checkedStatuses().length > 0 ? 1 : 0);
@@ -425,7 +399,6 @@ export class ProductList {
     return this.searchText().trim() !== '' || this.activeFilterCount() > 0;
   }
 
-  /** What the Status dropdown shows when closed: All, the one ticked status, or how many are ticked. */
   protected statusSummary(): string {
     const checked = this.checkedStatuses();
     if (checked.length === 0) {
@@ -440,7 +413,6 @@ export class ProductList {
     this.filterChanged();
   }
 
-  /** Clears the filters behind the Filters button. The search text stays. */
   protected clearFilters(): void {
     this.checkedStatuses.set([]);
     this.minStock.set(null);
@@ -455,7 +427,6 @@ export class ProductList {
     this.clearFilters();
   }
 
-  /** A click on a column heading sorts by it. A second click on the same heading reverses the order. */
   protected sortBy(column: SortColumn): void {
     if (this.sortColumn() === column) {
       this.sortAscending.set(!this.sortAscending());
@@ -493,7 +464,6 @@ export class ProductList {
     this.closeMenu();
   }
 
-  /** A click anywhere on a row opens the product. The name link, the checkbox, and the actions menu handle their own clicks. */
   protected openProduct(event: MouseEvent, id: number): void {
     if ((event.target as HTMLElement).closest('a, input, .dropdown')) {
       return;
@@ -506,10 +476,6 @@ export class ProductList {
     this.selectedIds.set(ids.includes(id) ? ids.filter((i) => i !== id) : [...ids, id]);
   }
 
-  /**
-   * Deletes products after a confirmation: one from its row menu, or the ticked ones from the selection bar.
-   * The API has no bulk delete, so it sends one request each.
-   */
   protected async deleteProducts(products: Product[]): Promise<void> {
     this.closeMenu();
     const what = products.length === 1 ? `"${products[0].name}"` : `${products.length} products`;
@@ -519,7 +485,6 @@ export class ProductList {
     const ids = products.map((p) => p.id);
     forkJoin(ids.map((id) => this.service.delete(id))).subscribe({
       next: () => {
-        // Deleted products are no longer ticked. Other ticks stay.
         this.selectedIds.set(this.selectedIds().filter((id) => !ids.includes(id)));
         this.load();
       },
@@ -530,10 +495,8 @@ export class ProductList {
     });
   }
 
-  /** Downloads every product that matches the filters, in the table's order and across all pages. Ticks do not matter. */
   protected export(): void {
     const link = document.createElement('a');
-    // The byte order mark at the start lets Excel read the file as UTF-8.
     link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + productsCsv(this.rows()));
     link.download = 'products.csv';
     link.click();

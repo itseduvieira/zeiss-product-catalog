@@ -2,14 +2,12 @@ import { Component, ElementRef, afterRenderEffect, inject, viewChild } from '@an
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { ApiStatus, Confirmation } from './product.service';
 
-/** The page frame: header, the current screen, footer, and the confirmation dialog. */
 @Component({
   selector: 'app-root',
   imports: [RouterLink, RouterOutlet],
   template: `
     <header class="bar">
       <a class="brand" routerLink="/products">
-        <!-- Empty alt: the link text already names it, so a screen reader does not say "ZEISS" twice -->
         <img src="zeiss-logo.svg" alt="" width="40" height="40" />
         Zeiss Vision
       </a>
@@ -27,7 +25,6 @@ import { ApiStatus, Confirmation } from './product.service';
       <p>Carl Zeiss Vision assessment</p>
     </footer>
 
-    <!-- Escape also closes it, which counts as Cancel -->
     <dialog #dialog aria-labelledby="dialog-title" aria-describedby="dialog-text" (close)="confirmation.answer(false)">
       <h2 id="dialog-title">{{ confirmation.question()?.title }}</h2>
       <p id="dialog-text">{{ confirmation.question()?.text }}</p>
@@ -44,7 +41,6 @@ export class App {
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
 
   constructor() {
-    // The dialog opens while a screen asks, as a modal: the rest of the page is dimmed and cannot be used.
     afterRenderEffect(() => {
       const dialog = this.dialog().nativeElement;
       if (this.confirmation.question() && !dialog.open) {
@@ -56,7 +52,6 @@ export class App {
     });
   }
 
-  /** Try again reloads the page, so the open screen starts over and asks the API again. */
   protected reload(): void {
     location.reload();
   }

@@ -13,46 +13,33 @@ import {
   ProductService,
   REFRESH_MS,
   errorMessage,
+  formatPrice,
   isUnreachable,
   stockStatus,
 } from './product.service';
 
-/** The result of the last action, shown under the part of the screen it belongs to. */
 interface Message {
   text: string;
   error: boolean;
 }
 
-/** A price as the price box shows it: 2,450.00. */
-export function formatPrice(price: number): string {
-  return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/** The price in a text such as 2,450.00. */
 export function parsePrice(text: string): number {
-  return Number(text.replace(/,/g, ''));
+  return Number(text.replace(/\./g, '').replace(',', '.'));
 }
 
-/**
- * The mask of the price box. The digits typed so far are read as cents, like a till, so typing 2 4 5 0 0 0
- * shows 0.02, 0.24, 2.45, 24.50, 245.00, then 2,450.00. Anything else typed is dropped.
- */
 export function maskPrice(text: string): string {
   const digits = text.replace(/\D/g, '');
   return digits === '' ? '' : formatPrice(Number(digits) / 100);
 }
 
-/** The API takes a price above 0 and up to 1,000,000. */
 function priceInRange(control: AbstractControl<string>): ValidationErrors | null {
   const price = parsePrice(control.value);
   return control.value === '' || (price > 0 && price <= 1000000) ? null : { priceRange: true };
 }
 
-/** Detail screen: one product's stock and details. Without an id it creates a product. */
 @Component({
   selector: 'app-product-detail',
   host: {
-    // The actions menu closes on a click outside it or on Escape, like the menus on the list.
     '(document:click)': 'closeMenuOnClickOutside($event)',
     '(document:keydown.escape)': 'menuOpen.set(false)',
     '(window:beforeunload)': 'warnBeforeUnload($event)',
@@ -145,7 +132,6 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
     @if (product() || isNew()) {
       <section class="section" aria-labelledby="details-heading">
         <h2 id="details-heading">Details</h2>
-        <!-- Typing clears the last save's result, so "Changes saved" never sits next to new changes -->
         <form [formGroup]="form" (ngSubmit)="save()" (input)="formMessage.set(null)" novalidate>
           <label class="field">
             <span>Name</span>
@@ -163,10 +149,9 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
           </label>
           <label class="field">
             <span>Price (€)</span>
-            <!-- Text with a mask, not a number box, so the price reads 2,450.00 while typing -->
-            <input inputmode="numeric" placeholder="0.00" formControlName="price" />
+            <input inputmode="numeric" placeholder="0,00" formControlName="price" />
             @if (invalid('price')) {
-              <span class="error">Enter a price above 0 and up to 1,000,000</span>
+              <span class="error">Enter a price above 0 and up to 1.000.000</span>
             }
           </label>
           @if (isNew()) {
@@ -205,7 +190,6 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
                 Save changes
               }
             </button>
-            <!-- Cancel leaves without saving: back to the list -->
             <a class="button" routerLink="/products">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                 <path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round" />
@@ -230,26 +214,20 @@ export class ProductDetail implements OnInit {
   protected readonly api = inject(ApiStatus);
   private readonly confirmation = inject(Confirmation);
 
-  /** The :id route parameter. Empty on /products/new. */
   readonly id = input<string>();
-  /** True on /products/new, where the screen creates a product. */
   protected readonly isNew = computed(() => !this.id());
 
   protected readonly stockStatus = stockStatus;
 
-  /** What the API returned for this product, or null on /products/new and until it arrives. */
   protected readonly product = signal<Product | null>(null);
   protected readonly categories = signal<Category[]>([]);
   protected readonly error = signal<string | null>(null);
   protected readonly stockMessage = signal<Message | null>(null);
   protected readonly formMessage = signal<Message | null>(null);
-  /** Whether the ⋮ menu in the header is open. */
   protected readonly menuOpen = signal(false);
 
-  /** How many units Remove and Add take away or put in. */
   protected readonly quantity = new FormControl(1, { nonNullable: true });
 
-  // These rules mirror the API's validation.
   protected readonly form = new FormGroup({
     name: new FormControl('', {
       nonNullable: true,
@@ -266,17 +244,12 @@ export class ProductDetail implements OnInit {
     categoryId: new FormControl<number | null>(null, [Validators.required]),
   });
 
-  /**
-   * The form's values when it last matched the saved product, or the empty form on /products/new.
-   * The form has unsaved changes while it differs from these, so undoing a change also undoes the notice.
-   */
   private savedValues = JSON.stringify(this.form.getRawValue());
 
   constructor() {
     interval(REFRESH_MS)
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.load());
-    // The mask: whatever is typed in the price box is shown again as 0,000.00.
     const price = this.form.controls.price;
     price.valueChanges.pipe(takeUntilDestroyed()).subscribe((text) => {
       if (maskPrice(text) !== text) {
@@ -285,12 +258,10 @@ export class ProductDetail implements OnInit {
     });
   }
 
-  // The id input is set from here on, not yet in the constructor.
   ngOnInit(): void {
     this.load();
   }
 
-  /** Loads the categories for the form and, unless the product is new, the product. */
   protected load(): void {
     this.service.getCategories().subscribe({
       next: (categories) => {
@@ -314,12 +285,10 @@ export class ProductDetail implements OnInit {
   }
 
   private loadFailed(error: HttpErrorResponse): void {
-    // An unreachable API shows in the ribbon under the header; other errors show here.
     this.api.unreachable.set(isUnreachable(error));
     this.error.set(isUnreachable(error) ? null : errorMessage(error));
   }
 
-  /** Shows the API's copy of the product. The form follows it, unless it has changes the user has not saved. */
   private showProduct(product: Product): void {
     this.product.set(product);
     if (!this.hasChanges()) {
@@ -327,7 +296,6 @@ export class ProductDetail implements OnInit {
     }
   }
 
-  /** Puts the product in the form, as its saved values. */
   private fillForm(product: Product): void {
     this.form.reset({
       name: product.name,
@@ -339,12 +307,10 @@ export class ProductDetail implements OnInit {
     this.markSaved();
   }
 
-  /** Takes what the form shows now as saved, so it has no unsaved changes. */
   private markSaved(): void {
     this.savedValues = JSON.stringify(this.form.getRawValue());
   }
 
-  /** Whether the form differs from the saved product. Shows Unsaved changes, and makes leaving ask first. */
   protected hasChanges(): boolean {
     return JSON.stringify(this.form.getRawValue()) !== this.savedValues;
   }
@@ -354,7 +320,6 @@ export class ProductDetail implements OnInit {
     return control.invalid && control.touched;
   }
 
-  /** Removes or adds the typed quantity. The API refuses to take stock below zero. */
   protected changeStock(direction: 'add' | 'remove'): void {
     const product = this.product()!;
     const quantity = this.quantity.value;
@@ -376,7 +341,6 @@ export class ProductDetail implements OnInit {
     });
   }
 
-  /** Creates the product and opens its screen, or saves the changes to it. */
   protected save(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -394,7 +358,6 @@ export class ProductDetail implements OnInit {
     if (!product) {
       this.service.create(details).subscribe({
         next: (created) => {
-          // Saved, so opening the new product's screen does not ask about leaving unsaved changes.
           this.markSaved();
           this.router.navigate(['/products', created.id]);
         },
@@ -402,7 +365,6 @@ export class ProductDetail implements OnInit {
       });
       return;
     }
-    // Stock changes through Add and Remove, so an edit keeps the stock the API holds.
     this.service.update(product.id, { ...details, stock: product.stock }).subscribe({
       next: (updated) => {
         this.product.set(updated);
@@ -413,15 +375,10 @@ export class ProductDetail implements OnInit {
     });
   }
 
-  /**
-   * Asked by the router before it leaves this screen, such as on Cancel. With unsaved changes,
-   * the user decides in the confirmation dialog.
-   */
   canLeave(): boolean | Promise<boolean> {
     return this.hasChanges() ? this.confirmation.askToLeave() : true;
   }
 
-  /** Reloading or closing the tab with unsaved changes makes the browser ask first, in its own words. */
   protected warnBeforeUnload(event: BeforeUnloadEvent): void {
     if (this.hasChanges()) {
       event.preventDefault();
@@ -434,7 +391,6 @@ export class ProductDetail implements OnInit {
     }
   }
 
-  /** Deletes the product after a confirmation, then goes back to the list. */
   protected async deleteProduct(): Promise<void> {
     this.menuOpen.set(false);
     const product = this.product()!;
@@ -443,7 +399,6 @@ export class ProductDetail implements OnInit {
     }
     this.service.delete(product.id).subscribe({
       next: () => {
-        // The product is gone, so there is nothing left to save.
         this.markSaved();
         this.router.navigate(['/products']);
       },

@@ -39,6 +39,8 @@ dotnet run --project src/ProductCatalog.Api
 
 The process listens at `http://localhost:5158`. On startup it applies the EF Core migrations, creates `src/ProductCatalog.Api/catalog.db` when that file is missing, and inserts 3 categories and 8 products.
 
+In VS Code, open the repository folder, choose **API** in Run and Debug, and press F5. It builds the project, starts it on the same port, and opens Swagger.
+
 Swagger is at [http://localhost:5158/swagger](http://localhost:5158/swagger) when `ASPNETCORE_ENVIRONMENT` is `Development`. The launch profile sets that value. `src/ProductCatalog.Api/ProductCatalog.Api.http` contains one request for each endpoint.
 
 ### Docker and Kubernetes
