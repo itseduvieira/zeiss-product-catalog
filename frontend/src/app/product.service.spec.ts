@@ -1,7 +1,7 @@
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { Confirmation, ProductInput, ProductService, errorMessage, isUnreachable, stockStatus } from './product.service';
+import { Confirmation, Notice, ProductInput, deletedText, ProductService, errorMessage, isUnreachable, stockStatus } from './product.service';
 
 describe('ProductService', () => {
   let service: ProductService;
@@ -83,6 +83,35 @@ describe('ProductService', () => {
     service.getCategories().subscribe();
     expect(http.expectOne('/api/categories').request.method).toBe('GET');
   });
+
+  it('gets one category', () => {
+    service.getCategory(2).subscribe();
+    expect(http.expectOne('/api/categories/2').request.method).toBe('GET');
+  });
+
+  it('creates a category', () => {
+    service.createCategory({ name: 'Lenses', description: 'Spectacle lenses' }).subscribe();
+    const request = http.expectOne('/api/categories');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ name: 'Lenses', description: 'Spectacle lenses' });
+  });
+
+  it('updates a category', () => {
+    service.updateCategory(2, { name: 'Objectives', description: '' }).subscribe();
+    const request = http.expectOne('/api/categories/2');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ name: 'Objectives', description: '' });
+  });
+
+  it('deletes a category, and can ask to move its products to Uncategorized', () => {
+    service.deleteCategory(4).subscribe();
+    const plain = http.expectOne((r) => r.url === '/api/categories/4');
+    expect(plain.request.method).toBe('DELETE');
+    expect(plain.request.params.get('moveProducts')).toBe('false');
+
+    service.deleteCategory(2, true).subscribe();
+    expect(http.expectOne((r) => r.url === '/api/categories/2').request.params.get('moveProducts')).toBe('true');
+  });
 });
 
 describe('errorMessage', () => {
@@ -97,6 +126,10 @@ describe('errorMessage', () => {
   it('uses the detail of other errors', () => {
     const error = new HttpErrorResponse({ status: 409, error: { detail: 'Not enough stock.' } });
     expect(errorMessage(error)).toBe('Not enough stock.');
+  });
+
+  it('gives a short plain text when the API sends no message', () => {
+    expect(errorMessage(new HttpErrorResponse({ status: 404, statusText: 'Not Found' }))).toBe('Something went wrong: 404 Not Found');
   });
 
   it('says so when the API cannot be reached', () => {
@@ -138,6 +171,18 @@ describe('Confirmation', () => {
     expect(confirmation.question()).toBeNull();
   });
 
+  it('offers to move the products to Uncategorized when the category has any', () => {
+    const confirmation = new Confirmation();
+
+    confirmation.askToDelete('"Optics"', 3);
+
+    expect(confirmation.question()).toEqual({
+      title: 'Delete "Optics"?',
+      text: '3 products move to Uncategorized',
+      action: 'Move and delete',
+    });
+  });
+
   it('asks before leaving unsaved changes', () => {
     const confirmation = new Confirmation();
 
@@ -145,5 +190,56 @@ describe('Confirmation', () => {
 
     expect(confirmation.question()?.title).toBe('Leave without saving?');
     expect(confirmation.question()?.action).toBe('Leave');
+  });
+});
+
+describe('Notice', () => {
+  it('closes an error shown with show() by itself, after 6 seconds', () => {
+    vi.useFakeTimers();
+    const notice = new Notice();
+
+    notice.show('Optics has 2 products. Move or delete them first', true);
+    expect(notice.message()).toEqual({ text: 'Optics has 2 products. Move or delete them first', error: true });
+
+    vi.advanceTimersByTime(5999);
+    expect(notice.message()).not.toBeNull();
+    vi.advanceTimersByTime(1);
+    expect(notice.message()).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('keeps an error until it is closed, with its action', () => {
+    vi.useFakeTimers();
+    const notice = new Notice();
+    const run = vi.fn();
+
+    notice.showError('The database is busy.', { label: 'Try again', run });
+    vi.advanceTimersByTime(10000);
+    expect(notice.message()?.text).toBe('The database is busy.');
+    expect(notice.message()?.action?.label).toBe('Try again');
+
+    notice.close();
+    expect(notice.message()).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('shows a message, and hides it again after 4 seconds', () => {
+    vi.useFakeTimers();
+    const notice = new Notice();
+
+    notice.show('Primo Star saved');
+    expect(notice.text()).toBe('Primo Star saved');
+
+    vi.advanceTimersByTime(4000);
+    expect(notice.text()).toBeNull();
+    vi.useRealTimers();
+  });
+});
+
+describe('deletedText', () => {
+  it('says what was deleted, and how many products moved to Uncategorized', () => {
+    expect(deletedText('Lenses', 0)).toBe('Lenses deleted');
+    expect(deletedText('Optics', 1)).toBe('Optics deleted, 1 product moved to Uncategorized');
+    expect(deletedText('2 categories', 5)).toBe('2 categories deleted, 5 products moved to Uncategorized');
   });
 });

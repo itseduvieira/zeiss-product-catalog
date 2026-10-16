@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ProductDetail, maskPrice } from './product-detail';
-import { Confirmation, Product, ProductService } from './product.service';
+import { Confirmation, Notice, Product, ProductService } from './product.service';
 
 const product: Product = {
   id: 100001,
@@ -20,8 +20,16 @@ const product: Product = {
 describe('ProductDetail', () => {
   const service = {
     get: vi.fn(() => of(product)),
-    getCategories: vi.fn(() => of([{ id: 1, name: 'Microscopes', description: '' }])),
+    getCategories: vi.fn(() =>
+      of([
+        { id: 1, name: 'Microscopes', description: '', productCount: 2 },
+        { id: 2, name: 'Optics', description: '', productCount: 3 },
+        { id: 3, name: 'Accessories', description: '', productCount: 3 },
+      ]),
+    ),
+    createCategory: vi.fn(() => of({ id: 4, name: 'Lenses', description: '', productCount: 0 })),
     addToStock: vi.fn(() => of({ ...product, stock: 9 })),
+    decrementStock: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Only 6 left in stock.' } }))),
     update: vi.fn(() => of(product)),
     delete: vi.fn(() => of(undefined)),
   };
@@ -32,6 +40,7 @@ describe('ProductDetail', () => {
       imports: [ProductDetail],
       providers: [provideRouter([]), { provide: ProductService, useValue: service }],
     }).compileComponents();
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
 
   async function render(id?: string) {
@@ -78,7 +87,7 @@ describe('ProductDetail', () => {
 
     expect(service.addToStock).toHaveBeenCalledWith(100001, 3);
     expect(page.querySelector('.reading')?.textContent).toContain('9 in stock');
-    expect(page.querySelector('.message')?.textContent).toBe('Added 3 to stock');
+    expect(TestBed.inject(Notice).message()).toEqual({ text: 'Added 3 to stock', error: false });
   });
 
   it('shows the price with two decimals, and saves it as a number', async () => {
@@ -97,6 +106,8 @@ describe('ProductDetail', () => {
       stock: 6,
       categoryId: 1,
     });
+    expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/products']);
+    expect(TestBed.inject(Notice).text()).toBe('Primo Star saved');
   });
 
   async function typeInto(fixture: Awaited<ReturnType<typeof render>>, control: string, value: string) {
@@ -182,6 +193,7 @@ describe('ProductDetail', () => {
 
     expect(service.delete).toHaveBeenCalledWith(100001);
     expect(navigate).toHaveBeenCalledWith(['/products']);
+    expect(TestBed.inject(Notice).text()).toBe('Primo Star deleted');
   });
 
   it('shows an empty form with a starting stock for a new product', async () => {
@@ -201,19 +213,135 @@ describe('ProductDetail', () => {
     expect(cancel?.getAttribute('href')).toBe('/products');
   });
 
-  it('shows the API message with Try again when the product cannot be loaded, and Try again loads it', async () => {
-    service.get.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 404, error: { detail: 'Product 100001 was not found.' } })));
+  it('shows a load error in the notice with Try again, which loads the product and clears the notice', async () => {
+    service.get.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 500, error: { detail: 'The database is busy.' } })));
+    const fixture = await render('100001');
+    const page = fixture.nativeElement as HTMLElement;
+    const notice = TestBed.inject(Notice);
+
+    expect(notice.message()?.text).toBe('The database is busy.');
+    expect(notice.message()?.error).toBe(true);
+    expect(page.querySelector('h1')).toBeNull();
+
+    notice.message()!.action!.run();
+    await fixture.whenStable();
+
+    expect(page.querySelector('h1')?.textContent).toBe('Primo Star');
+    expect(notice.message()).toBeNull();
+  });
+
+  it('shows stock errors in the notice', async () => {
     const fixture = await render('100001');
     const page = fixture.nativeElement as HTMLElement;
 
-    expect(page.querySelector('.error')?.textContent).toContain('Product 100001 was not found.');
-    expect(page.querySelector('h1')).toBeNull();
-
-    button(page, 'Try again').click();
+    page.querySelector<HTMLButtonElement>('button[aria-label="Remove from stock"]')!.click();
     await fixture.whenStable();
 
+    expect(TestBed.inject(Notice).message()).toEqual({ text: 'Only 6 left in stock.', error: true });
+  });
+
+  it('shows Product not found for an id that is not a number, without asking the API', async () => {
+    const page = (await render('100001asaf')).nativeElement as HTMLElement;
+
+    expect(service.get).not.toHaveBeenCalled();
+    expect(page.querySelector('.empty-state h1')?.textContent).toBe('Product not found');
+    expect(page.querySelector('.empty-state p')?.textContent).toBe('There is no product 100001asaf in the catalog');
+    expect(page.querySelector('.empty-state a.button')?.getAttribute('href')).toBe('/products');
+    expect(page.textContent).not.toContain('Loading product');
+  });
+
+  it('shows Product not found when the API has no such product', async () => {
+    service.get.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 404, error: { detail: 'Product 999999 was not found.' } })));
+    const page = (await render('999999')).nativeElement as HTMLElement;
+
+    expect(page.querySelector('.empty-state h1')?.textContent).toBe('Product not found');
     expect(page.querySelector('.error')).toBeNull();
-    expect(page.querySelector('h1')?.textContent).toBe('Primo Star');
+    expect(page.querySelector('form')).toBeNull();
+  });
+
+  async function typeCategory(fixture: Awaited<ReturnType<typeof render>>, text: string) {
+    const input = (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#category')!;
+    input.dispatchEvent(new Event('focus'));
+    input.value = text;
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    return input;
+  }
+
+  function options(page: HTMLElement) {
+    return Array.from(page.querySelectorAll<HTMLElement>('.listbox li')).map((li) => li.textContent?.trim());
+  }
+
+  async function saveChanges(fixture: Awaited<ReturnType<typeof render>>) {
+    button(fixture.nativeElement as HTMLElement, 'Save changes').click();
+    await fixture.whenStable();
+  }
+
+  it('shows the category by name, and filters the categories while typing', async () => {
+    const fixture = await render('100001');
+    const page = fixture.nativeElement as HTMLElement;
+
+    expect(page.querySelector<HTMLInputElement>('#category')?.value).toBe('Microscopes');
+
+    await typeCategory(fixture, 'acc');
+
+    expect(options(page)).toEqual(['Accessories', 'Create "acc"']);
+  });
+
+  it('chooses a category with the mouse', async () => {
+    const fixture = await render('100001');
+    const page = fixture.nativeElement as HTMLElement;
+
+    await typeCategory(fixture, 'opt');
+    page.querySelector<HTMLElement>('.listbox li')!.click();
+    await fixture.whenStable();
+
+    expect(page.querySelector<HTMLInputElement>('#category')?.value).toBe('Optics');
+    await saveChanges(fixture);
+    expect(service.update).toHaveBeenCalledWith(100001, expect.objectContaining({ categoryId: 2 }));
+  });
+
+  it('chooses a category with the arrow keys and Enter', async () => {
+    const fixture = await render('100001');
+    const input = await typeCategory(fixture, 'o');
+
+    expect(options(fixture.nativeElement)).toEqual(['Accessories', 'Microscopes', 'Optics', 'Create "o"']);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await fixture.whenStable();
+
+    expect(input.value).toBe('Optics');
+    await saveChanges(fixture);
+    expect(service.update).toHaveBeenCalledWith(100001, expect.objectContaining({ categoryId: 2 }));
+  });
+
+  it('creates a new category from the field and selects it', async () => {
+    const fixture = await render('100001');
+    const page = fixture.nativeElement as HTMLElement;
+
+    await typeCategory(fixture, ' Lenses ');
+    expect(options(page)).toEqual(['Create "Lenses"']);
+    page.querySelector<HTMLElement>('.listbox li.create')!.click();
+    await fixture.whenStable();
+
+    expect(service.createCategory).toHaveBeenCalledWith({ name: 'Lenses', description: '' });
+    expect(page.querySelector<HTMLInputElement>('#category')?.value).toBe('Lenses');
+    await saveChanges(fixture);
+    expect(service.update).toHaveBeenCalledWith(100001, expect.objectContaining({ categoryId: 4 }));
+  });
+
+  it('asks to choose or create a category when an unknown name is left in the field', async () => {
+    const fixture = await render('100001');
+    const page = fixture.nativeElement as HTMLElement;
+
+    const input = await typeCategory(fixture, 'Nothing like this');
+    input.dispatchEvent(new Event('blur'));
+    await fixture.whenStable();
+
+    expect(page.querySelector('.field .error')?.textContent).toBe('Choose or create a category');
+    await saveChanges(fixture);
+    expect(service.update).not.toHaveBeenCalled();
   });
 });
 

@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ProductList, productsCsv } from './product-list';
-import { ApiStatus, Confirmation, Product, ProductService } from './product.service';
+import { ApiStatus, Confirmation, Notice, Product, ProductService } from './product.service';
 
 const products: Product[] = [
   {
@@ -283,19 +283,25 @@ describe('ProductList', () => {
     expect(ask).toHaveBeenCalledWith('"Primo Star"');
     expect(service.delete).toHaveBeenCalledTimes(1);
     expect(service.delete).toHaveBeenCalledWith(100001);
+    expect(TestBed.inject(Notice).text()).toBe('Primo Star deleted');
     expect(navigate).not.toHaveBeenCalled();
     expect(page.querySelector('.menu')).toBeNull();
   });
 
-  it('opens the row menu below a row, and above the last row', async () => {
+  it('opens the product page from Edit in the row menu, and keeps one row menu open at a time', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     await render();
 
     await click(page.querySelector<HTMLButtonElement>('button[aria-label="Actions for Primo Star"]')!);
-    expect(page.querySelector('.menu')?.classList).toContain('below');
-
     await click(page.querySelector<HTMLButtonElement>('button[aria-label="Actions for LED illuminator"]')!);
     expect(page.querySelectorAll('.menu').length).toBe(1);
-    expect(page.querySelector('.menu')?.classList).not.toContain('below');
+    expect(Array.from(page.querySelectorAll('.menu button')).map((b) => b.textContent?.trim())).toEqual(['Edit', 'Delete']);
+
+    await click(Array.from(page.querySelectorAll<HTMLButtonElement>('.menu button')).find((b) => b.textContent?.trim() === 'Edit')!);
+
+    expect(navigate).toHaveBeenCalledWith(['/products', 100007]);
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(page.querySelector('.menu')).toBeNull();
   });
 
   it('shows the selection bar with the count only while rows are ticked, and its close button clears the ticks', async () => {
@@ -318,6 +324,7 @@ describe('ProductList', () => {
     await click(page.querySelector<HTMLButtonElement>('.selection-bar button.danger')!);
 
     expect(ask).toHaveBeenCalledWith('2 products');
+    expect(TestBed.inject(Notice).text()).toBe('2 products deleted');
     expect(service.delete).toHaveBeenCalledWith(100001);
     expect(service.delete).toHaveBeenCalledWith(100007);
     expect(page.querySelector('.selection-bar')).toBeNull();

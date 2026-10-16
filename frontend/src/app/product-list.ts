@@ -7,6 +7,7 @@ import { Observable, Subscription, forkJoin, interval } from 'rxjs';
 import {
   ApiStatus,
   Confirmation,
+  Notice,
   Product,
   ProductService,
   REFRESH_MS,
@@ -43,7 +44,12 @@ export function productsCsv(products: Product[]): string {
 
 @Component({
   selector: 'app-product-list',
-  host: { '(document:click)': 'closeMenuOnClickOutside($event)', '(document:keydown.escape)': 'closeMenu()' },
+  host: {
+    '(document:click)': 'closeMenuOnClickOutside($event)',
+    '(document:keydown.escape)': 'closeMenu()',
+    '(window:scroll)': 'closeMenu()',
+    '(window:resize)': 'closeMenu()',
+  },
   imports: [FormsModule, RouterLink],
   template: `
     <header class="page-header">
@@ -143,14 +149,10 @@ export function productsCsv(products: Product[]): string {
       </div>
     }
 
-    @if (error()) {
-      <p class="error">{{ error() }} <button type="button" (click)="load()">Try again</button></p>
-    }
-
     @if (loading() && products().length === 0) {
       <p class="muted">Loading products…</p>
     } @else if (rows().length > 0) {
-      <div class="table-scroll">
+      <div class="table-scroll" (scroll)="closeMenu()">
         <table>
           <thead>
             <tr>
@@ -170,7 +172,7 @@ export function productsCsv(products: Product[]): string {
             </tr>
           </thead>
           <tbody>
-            @for (product of pageRows(); track product.id; let last = $last) {
+            @for (product of pageRows(); track product.id) {
               <tr class="clickable" (click)="openProduct($event, product.id)">
                 <td class="check">
                   <input
@@ -197,7 +199,7 @@ export function productsCsv(products: Product[]): string {
                       aria-haspopup="true"
                       [attr.aria-label]="'Actions for ' + product.name"
                       [attr.aria-expanded]="openMenu() === product.id"
-                      (click)="toggleMenu(product.id)"
+                      (click)="toggleRowMenu($event, product.id)"
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                         <circle cx="8" cy="3" r="1.25" />
@@ -206,7 +208,20 @@ export function productsCsv(products: Product[]): string {
                       </svg>
                     </button>
                     @if (openMenu() === product.id) {
-                      <div class="menu end" [class.below]="!last" role="group" [attr.aria-label]="'Actions for ' + product.name">
+                      <div
+                        class="menu row-menu"
+                        role="group"
+                        [attr.aria-label]="'Actions for ' + product.name"
+                        [style.top.px]="rowMenuPlace().top"
+                        [style.bottom.px]="rowMenuPlace().bottom"
+                        [style.right.px]="rowMenuPlace().right"
+                      >
+                        <button type="button" (click)="editProduct(product.id)">
+                          Edit
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            <path d="M10.5 2.5l3 3L5 14H2v-3l8.5-8.5z" stroke-linejoin="round" />
+                          </svg>
+                        </button>
                         <button class="danger" type="button" (click)="deleteProducts([product])">
                           Delete
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -293,6 +308,7 @@ export class ProductList {
   private readonly router = inject(Router);
   protected readonly api = inject(ApiStatus);
   private readonly confirmation = inject(Confirmation);
+  private readonly notice = inject(Notice);
   private loadSubscription?: Subscription;
 
   protected readonly stockStatus = stockStatus;
@@ -316,6 +332,7 @@ export class ProductList {
   protected readonly sortAscending = signal(true);
 
   protected readonly openMenu = signal<Menu | null>(null);
+  protected readonly rowMenuPlace = signal<{ top?: number; bottom?: number; right: number }>({ right: 0 });
 
   protected readonly selectedIds = signal<number[]>([]);
 
@@ -360,16 +377,31 @@ export class ProductList {
     this.loadSubscription = this.request().subscribe({
       next: (products) => {
         this.products.set(products);
-        this.error.set(null);
-        this.api.unreachable.set(false);
+        this.loaded();
         this.loading.set(false);
       },
       error: (error: HttpErrorResponse) => {
-        this.api.unreachable.set(isUnreachable(error));
-        this.error.set(isUnreachable(error) ? null : errorMessage(error));
+        this.loadFailed(error);
         this.loading.set(false);
       },
     });
+  }
+
+  private loaded(): void {
+    if (this.error() && this.notice.text() === this.error()) {
+      this.notice.close();
+    }
+    this.error.set(null);
+    this.api.unreachable.set(false);
+  }
+
+  private loadFailed(error: HttpErrorResponse): void {
+    this.api.unreachable.set(isUnreachable(error));
+    const message = isUnreachable(error) ? null : errorMessage(error);
+    if (message && !this.error()) {
+      this.notice.showError(message, { label: 'Try again', run: () => this.load() });
+    }
+    this.error.set(message);
   }
 
   private request(): Observable<Product[]> {
@@ -444,6 +476,22 @@ export class ProductList {
     return this.sortAscending() ? 'ascending' : 'descending';
   }
 
+  protected toggleRowMenu(event: MouseEvent, id: number): void {
+    const button = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const viewport = document.documentElement;
+    const right = viewport.clientWidth - button.right;
+    const fitsBelow = button.bottom + 100 <= viewport.clientHeight;
+    this.rowMenuPlace.set(
+      fitsBelow ? { top: button.bottom + 4, right } : { bottom: viewport.clientHeight - button.top + 4, right },
+    );
+    this.toggleMenu(id);
+  }
+
+  protected editProduct(id: number): void {
+    this.closeMenu();
+    this.router.navigate(['/products', id]);
+  }
+
   protected toggleMenu(menu: Menu): void {
     this.openMenu.set(this.openMenu() === menu ? null : menu);
   }
@@ -486,10 +534,11 @@ export class ProductList {
     forkJoin(ids.map((id) => this.service.delete(id))).subscribe({
       next: () => {
         this.selectedIds.set(this.selectedIds().filter((id) => !ids.includes(id)));
+        this.notice.show(products.length === 1 ? `${products[0].name} deleted` : `${products.length} products deleted`);
         this.load();
       },
       error: (error: HttpErrorResponse) => {
-        this.error.set(errorMessage(error));
+        this.notice.show(errorMessage(error), true);
         this.load();
       },
     });

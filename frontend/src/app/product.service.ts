@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { environment } from '../environments/environment';
 
 export interface Product {
@@ -24,6 +24,13 @@ export interface ProductInput {
 
 export interface Category {
   id: number;
+  name: string;
+  description: string;
+  productCount: number;
+  isUncategorized: boolean;
+}
+
+export interface CategoryInput {
   name: string;
   description: string;
 }
@@ -60,6 +67,7 @@ export function stockStatus(stock: number): StockStatus {
 export class ProductService {
   private readonly http = inject(HttpClient);
   private readonly url = `${environment.apiUrl}/api/products`;
+  private readonly categoriesUrl = `${environment.apiUrl}/api/categories`;
 
   getAll() {
     return this.http.get<Product[]>(this.url);
@@ -98,7 +106,23 @@ export class ProductService {
   }
 
   getCategories() {
-    return this.http.get<Category[]>(`${environment.apiUrl}/api/categories`);
+    return this.http.get<Category[]>(this.categoriesUrl);
+  }
+
+  getCategory(id: number) {
+    return this.http.get<Category>(`${this.categoriesUrl}/${id}`);
+  }
+
+  createCategory(category: CategoryInput) {
+    return this.http.post<Category>(this.categoriesUrl, category);
+  }
+
+  updateCategory(id: number, category: CategoryInput) {
+    return this.http.put<Category>(`${this.categoriesUrl}/${id}`, category);
+  }
+
+  deleteCategory(id: number, moveProducts = false) {
+    return this.http.delete<void>(`${this.categoriesUrl}/${id}`, { params: { moveProducts } });
   }
 }
 
@@ -118,7 +142,11 @@ export class Confirmation {
   readonly question = signal<Question | null>(null);
   private resolve?: (confirmed: boolean) => void;
 
-  askToDelete(what: string): Promise<boolean> {
+  askToDelete(what: string, movedProducts = 0): Promise<boolean> {
+    if (movedProducts > 0) {
+      const products = movedProducts === 1 ? '1 product moves' : `${movedProducts} products move`;
+      return this.ask({ title: `Delete ${what}?`, text: `${products} to Uncategorized`, action: 'Move and delete' });
+    }
     return this.ask({ title: `Delete ${what}?`, text: 'This cannot be undone', action: 'Delete' });
   }
 
@@ -138,6 +166,51 @@ export class Confirmation {
   }
 }
 
+export interface NoticeAction {
+  label: string;
+  run: () => void;
+}
+
+export interface NoticeMessage {
+  text: string;
+  error: boolean;
+  action?: NoticeAction;
+}
+
+@Injectable({ providedIn: 'root' })
+export class Notice {
+  readonly message = signal<NoticeMessage | null>(null);
+  readonly text = computed(() => this.message()?.text ?? null);
+  private timer?: ReturnType<typeof setTimeout>;
+
+  show(text: string, error = false): void {
+    this.open({ text, error });
+    this.timer = setTimeout(() => this.close(), error ? 6000 : 4000);
+  }
+
+  showError(text: string, action?: NoticeAction): void {
+    this.open({ text, error: true, action });
+  }
+
+  close(): void {
+    clearTimeout(this.timer);
+    this.message.set(null);
+  }
+
+  private open(message: NoticeMessage): void {
+    clearTimeout(this.timer);
+    this.message.set(message);
+  }
+}
+
+export function deletedText(what: string, movedProducts: number): string {
+  if (movedProducts === 0) {
+    return `${what} deleted`;
+  }
+  const products = movedProducts === 1 ? '1 product' : `${movedProducts} products`;
+  return `${what} deleted, ${products} moved to Uncategorized`;
+}
+
 export function isUnreachable(error: HttpErrorResponse): boolean {
   return [0, 502, 503, 504].includes(error.status) && !error.error?.detail && !error.error?.errors;
 }
@@ -150,5 +223,8 @@ export function errorMessage(error: HttpErrorResponse): string {
   if (error.error?.detail) {
     return error.error.detail;
   }
-  return isUnreachable(error) ? 'The API is not reachable' : error.message;
+  if (isUnreachable(error)) {
+    return 'The API is not reachable';
+  }
+  return `Something went wrong: ${error.status} ${error.statusText}`.trim();
 }

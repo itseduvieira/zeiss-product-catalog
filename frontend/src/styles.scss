@@ -20,6 +20,7 @@
   --header-fill: #e6ebf0;
   --selected-fill: #eaf7ff;
   --line-on-ink: #4e565f;
+  --danger-on-ink: #ff9b9b;
 
   --font: 'Instrument Sans', system-ui, sans-serif;
   --text-xs: 0.75rem;
@@ -170,6 +171,45 @@ footer.bar p {
   text-decoration: none;
 }
 
+.nav {
+  display: flex;
+  align-self: stretch;
+  gap: var(--space-4);
+  margin-right: auto;
+  margin-left: var(--space-4);
+}
+
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.nav a:hover {
+  color: var(--link);
+}
+
+.nav a.active {
+  color: var(--link);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.menu-button {
+  display: none;
+  width: var(--field);
+  padding: 0;
+  border-color: transparent;
+  background: none;
+}
+
+.menu-button:hover {
+  border-color: var(--line);
+}
+
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -221,7 +261,8 @@ footer.bar p {
   margin-bottom: var(--space-4);
 }
 
-.toolbar > button[aria-expanded='true'] {
+.toolbar > button[aria-expanded='true'],
+.filter-bar > button[aria-pressed='true'] {
   border-color: var(--accent);
   background: var(--selected-fill);
   color: var(--link);
@@ -348,6 +389,12 @@ button:disabled:hover {
   transform: translateX(-50%);
 }
 
+[data-tooltip]:first-child:hover::after,
+[data-tooltip]:first-child:focus-visible::after {
+  left: 0;
+  transform: none;
+}
+
 .icon-button {
   width: 1.75rem;
   min-height: 1.75rem;
@@ -429,6 +476,12 @@ button:disabled:hover {
 
 .menu.end {
   right: 0;
+  left: auto;
+}
+
+.menu.row-menu {
+  position: fixed;
+  bottom: auto;
   left: auto;
 }
 
@@ -550,8 +603,65 @@ input[type='checkbox']:focus-visible {
   margin-bottom: var(--space-3);
 }
 
-.field > span {
+.field > span,
+.field > label {
   font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+app-category-picker {
+  display: block;
+}
+
+.combobox {
+  position: relative;
+}
+
+.combobox > input {
+  width: 100%;
+  padding-right: 2.25rem;
+}
+
+.combobox > svg {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  color: var(--muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+app-category-picker.ng-invalid.ng-touched input {
+  border-bottom-color: var(--danger);
+  background: var(--field-error);
+}
+
+.listbox {
+  right: 0;
+  max-height: 15rem;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.listbox > li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.listbox > li.active,
+.listbox > li:hover {
+  background: var(--row-hover);
+}
+
+.listbox > li.create {
+  color: var(--link);
   font-weight: 500;
 }
 
@@ -643,6 +753,30 @@ tr.clickable:hover {
 .name:hover {
   color: var(--ink);
   text-decoration: underline;
+}
+
+app-not-found {
+  display: contents;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 26rem;
+  margin: auto;
+  padding-block: var(--space-5);
+  text-align: center;
+}
+
+.empty-state > h1,
+.empty-state > p {
+  margin: 0;
+}
+
+.empty-state > svg {
+  color: var(--muted);
 }
 
 .section {
@@ -748,11 +882,6 @@ tr.clickable:hover {
   color: var(--danger);
 }
 
-.message {
-  margin: var(--space-3) 0 0;
-  font-size: var(--text-sm);
-}
-
 .unsaved {
   display: inline-flex;
   align-items: center;
@@ -776,6 +905,45 @@ tr.clickable:hover {
 }
 
 @media (max-width: 40rem) {
+  header.bar {
+    position: relative;
+  }
+
+  .menu-button {
+    display: inline-flex;
+  }
+
+  .nav {
+    display: none;
+  }
+
+  .nav.open {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .nav.open a {
+    min-height: var(--field);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius);
+    font-size: var(--text-md);
+  }
+
+  .nav.open a.active {
+    box-shadow: none;
+    background: var(--selected-fill);
+  }
+
   th,
   td {
     padding-inline: 0.6rem;
@@ -824,7 +992,8 @@ tr.clickable:hover {
   min-height: 2rem;
 }
 
-.table-footer:has(+ .selection-bar) {
+.table-footer:has(+ .selection-bar),
+.table-scroll:has(+ .selection-bar) {
   margin-bottom: var(--space-4);
 }
 
@@ -833,6 +1002,56 @@ dialog .danger {
   border-color: var(--danger);
   background: var(--danger);
   color: var(--surface);
+}
+
+.toast {
+  position: fixed;
+  bottom: var(--space-5);
+  left: 50%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: calc(100% - 2 * var(--space-3));
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-container);
+  background: var(--ink);
+  color: var(--surface);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transform: translateX(-50%);
+}
+
+body:has(.selection-bar) .toast {
+  bottom: calc(var(--space-4) + 3.25rem + var(--space-3));
+}
+
+.toast > svg {
+  flex: none;
+  color: var(--ok-fill);
+}
+
+.toast.error > svg {
+  color: var(--danger-on-ink);
+}
+
+.toast :focus-visible {
+  outline-color: var(--surface);
+}
+
+.toast-close {
+  flex: none;
+  width: 1.75rem;
+  min-height: 1.75rem;
+  margin-right: calc(-1 * var(--space-2));
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--surface);
+}
+
+.toast-close:hover {
+  border-color: var(--line-on-ink);
 }
 
 dialog {

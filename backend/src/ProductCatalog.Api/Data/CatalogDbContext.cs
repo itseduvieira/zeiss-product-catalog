@@ -19,8 +19,8 @@ public class CatalogDbContext : DbContext
     {
         modelBuilder.Entity<Category>(category =>
         {
-            category.Property(c => c.Name).HasMaxLength(80).IsRequired();
-            category.Property(c => c.Description).HasMaxLength(400);
+            category.Property(c => c.Name).HasMaxLength(CategoryRules.NameMaxLength).IsRequired();
+            category.Property(c => c.Description).HasMaxLength(CategoryRules.DescriptionMaxLength);
             category.HasIndex(c => c.Name).IsUnique();
             category.HasData(SeedData.Categories());
         });

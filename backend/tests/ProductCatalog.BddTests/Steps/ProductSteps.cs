@@ -22,6 +22,70 @@ public sealed class ProductSteps
     [When("I list categories")]
     public Task ListCategories() => SendAsync(HttpMethod.Get, "/api/categories");
 
+    [When("I create a category named {string}")]
+    public Task CreateCategory(string name) =>
+        SendAsync(HttpMethod.Post, "/api/categories", new { name, description = "Added by a test" });
+
+    [When("I fetch category {int}")]
+    public Task FetchCategory(int id) => SendAsync(HttpMethod.Get, $"/api/categories/{id}");
+
+    [When("I rename category {int} to {string}")]
+    public Task RenameCategory(int id, string name) =>
+        SendAsync(HttpMethod.Put, $"/api/categories/{id}", new { name, description = "Renamed by a test" });
+
+    [When("I delete category {int}")]
+    public Task DeleteCategory(int id) => SendAsync(HttpMethod.Delete, $"/api/categories/{id}");
+
+    [When("I delete category {int} and move its products to category {int}")]
+    public Task DeleteCategoryMovingProducts(int id, int moveTo) =>
+        SendAsync(HttpMethod.Delete, $"/api/categories/{id}?moveTo={moveTo}");
+
+    [When("I delete category {int} and move its products to Uncategorized")]
+    public async Task DeleteCategoryMovingProductsToUncategorized(int id) =>
+        await SendAsync(HttpMethod.Delete, $"/api/categories/{id}?moveTo={await UncategorizedIdAsync()}");
+
+    [When("I delete the Uncategorized category")]
+    public async Task DeleteUncategorized() =>
+        await SendAsync(HttpMethod.Delete, $"/api/categories/{await UncategorizedIdAsync()}?moveTo=1");
+
+    private async Task<int> UncategorizedIdAsync()
+    {
+        await SendAsync(HttpMethod.Get, "/api/categories");
+        return _session.Body.EnumerateArray()
+            .Single(item => item.GetProperty("isUncategorized").GetBoolean())
+            .GetProperty("id").GetInt32();
+    }
+
+    [Then("the product category is {string}")]
+    public void ProductCategory(string name)
+    {
+        Assert.Equal(name, _session.Body.GetProperty("categoryName").GetString());
+    }
+
+    [When("I delete the category I remembered")]
+    public Task DeleteRememberedCategory() => DeleteCategory(_session.RememberedId!.Value);
+
+    [When("I fetch the category I remembered")]
+    public Task FetchRememberedCategory() => FetchCategory(_session.RememberedId!.Value);
+
+    [When("I remember the category id")]
+    public void RememberCategory()
+    {
+        _session.RememberedId = _session.Body.GetProperty("id").GetInt32();
+    }
+
+    [Then("the category name is {string}")]
+    public void CategoryName(string name)
+    {
+        Assert.Equal(name, _session.Body.GetProperty("name").GetString());
+    }
+
+    [Then("the category has {int} products")]
+    public void CategoryProductCount(int count)
+    {
+        Assert.Equal(count, _session.Body.GetProperty("productCount").GetInt32());
+    }
+
     [When("I fetch product {int}")]
     public Task Fetch(int id) => SendAsync(HttpMethod.Get, $"/api/products/{id}");
 

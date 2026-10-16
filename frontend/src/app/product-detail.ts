@@ -3,11 +3,14 @@ import { Component, OnInit, computed, inject, input, signal } from '@angular/cor
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormControl, FormGroup, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { CategoryPicker } from './category-picker';
+import { NotFound } from './not-found';
 import { interval } from 'rxjs';
 import {
   ApiStatus,
   Category,
   Confirmation,
+  Notice,
   Product,
   ProductInput,
   ProductService,
@@ -17,11 +20,6 @@ import {
   isUnreachable,
   stockStatus,
 } from './product.service';
-
-interface Message {
-  text: string;
-  error: boolean;
-}
 
 export function parsePrice(text: string): number {
   return Number(text.replace(/\./g, '').replace(',', '.'));
@@ -44,10 +42,10 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
     '(document:keydown.escape)': 'menuOpen.set(false)',
     '(window:beforeunload)': 'warnBeforeUnload($event)',
   },
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [CategoryPicker, NotFound, ReactiveFormsModule, RouterLink],
   template: `
-    @if (error()) {
-      <p class="error">{{ error() }} <button type="button" (click)="load()">Try again</button></p>
+    @if (notFound()) {
+      <app-not-found title="Product not found" [message]="'There is no product ' + id() + ' in the catalog'" />
     }
 
     @if (product() || isNew()) {
@@ -98,7 +96,7 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
           </div>
         }
       </header>
-    } @else if (!error() && !api.unreachable()) {
+    } @else if (!error() && !api.unreachable() && !notFound()) {
       <p class="muted">Loading product…</p>
     }
 
@@ -123,16 +121,13 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
             </svg>
           </button>
         </div>
-        @if (stockMessage(); as message) {
-          <p class="message" [class.error]="message.error" role="status">{{ message.text }}</p>
-        }
       </section>
     }
 
     @if (product() || isNew()) {
       <section class="section" aria-labelledby="details-heading">
         <h2 id="details-heading">Details</h2>
-        <form [formGroup]="form" (ngSubmit)="save()" (input)="formMessage.set(null)" novalidate>
+        <form [formGroup]="form" (ngSubmit)="save()" novalidate>
           <label class="field">
             <span>Name</span>
             <input formControlName="name" />
@@ -163,18 +158,13 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
               }
             </label>
           }
-          <label class="field">
-            <span>Category</span>
-            <select formControlName="categoryId">
-              <option [ngValue]="null" disabled>Choose a category</option>
-              @for (category of categories(); track category.id) {
-                <option [ngValue]="category.id">{{ category.name }}</option>
-              }
-            </select>
+          <div class="field">
+            <label for="category">Category</label>
+            <app-category-picker formControlName="categoryId" [categories]="categories()" (created)="addCategory($event)" />
             @if (invalid('categoryId')) {
-              <span class="error">Choose a category</span>
+              <span class="error">Choose or create a category</span>
             }
-          </label>
+          </div>
 
           <div class="row">
             <button class="primary" type="submit">
@@ -200,9 +190,6 @@ function priceInRange(control: AbstractControl<string>): ValidationErrors | null
               <span class="unsaved" role="status">Unsaved changes</span>
             }
           </div>
-          @if (formMessage(); as message) {
-            <p class="message" [class.error]="message.error" role="status">{{ message.text }}</p>
-          }
         </form>
       </section>
     }
@@ -213,6 +200,7 @@ export class ProductDetail implements OnInit {
   private readonly router = inject(Router);
   protected readonly api = inject(ApiStatus);
   private readonly confirmation = inject(Confirmation);
+  private readonly notice = inject(Notice);
 
   readonly id = input<string>();
   protected readonly isNew = computed(() => !this.id());
@@ -222,8 +210,7 @@ export class ProductDetail implements OnInit {
   protected readonly product = signal<Product | null>(null);
   protected readonly categories = signal<Category[]>([]);
   protected readonly error = signal<string | null>(null);
-  protected readonly stockMessage = signal<Message | null>(null);
-  protected readonly formMessage = signal<Message | null>(null);
+  protected readonly notFound = signal(false);
   protected readonly menuOpen = signal(false);
 
   protected readonly quantity = new FormControl(1, { nonNullable: true });
@@ -274,19 +261,42 @@ export class ProductDetail implements OnInit {
     if (!id) {
       return;
     }
+    if (!/^\d+$/.test(id)) {
+      this.notFound.set(true);
+      return;
+    }
     this.service.get(Number(id)).subscribe({
       next: (product) => {
         this.showProduct(product);
-        this.error.set(null);
-        this.api.unreachable.set(false);
+        this.notFound.set(false);
+        this.loaded();
       },
-      error: (error: HttpErrorResponse) => this.loadFailed(error),
+      error: (error: HttpErrorResponse) => {
+        if (error.status === 404) {
+          this.product.set(null);
+          this.notFound.set(true);
+          return;
+        }
+        this.loadFailed(error);
+      },
     });
+  }
+
+  private loaded(): void {
+    if (this.error() && this.notice.text() === this.error()) {
+      this.notice.close();
+    }
+    this.error.set(null);
+    this.api.unreachable.set(false);
   }
 
   private loadFailed(error: HttpErrorResponse): void {
     this.api.unreachable.set(isUnreachable(error));
-    this.error.set(isUnreachable(error) ? null : errorMessage(error));
+    const message = isUnreachable(error) ? null : errorMessage(error);
+    if (message && !this.error()) {
+      this.notice.showError(message, { label: 'Try again', run: () => this.load() });
+    }
+    this.error.set(message);
   }
 
   private showProduct(product: Product): void {
@@ -315,6 +325,10 @@ export class ProductDetail implements OnInit {
     return JSON.stringify(this.form.getRawValue()) !== this.savedValues;
   }
 
+  protected addCategory(category: Category): void {
+    this.categories.set([...this.categories(), category]);
+  }
+
   protected invalid(name: keyof typeof this.form.controls): boolean {
     const control = this.form.controls[name];
     return control.invalid && control.touched;
@@ -324,7 +338,7 @@ export class ProductDetail implements OnInit {
     const product = this.product()!;
     const quantity = this.quantity.value;
     if (!Number.isInteger(quantity) || quantity < 1) {
-      this.stockMessage.set({ text: 'Enter a whole quantity of 1 or more', error: true });
+      this.notice.showError('Enter a whole quantity of 1 or more');
       return;
     }
     const request =
@@ -335,9 +349,9 @@ export class ProductDetail implements OnInit {
       next: (updated) => {
         this.showProduct(updated);
         const text = direction === 'add' ? `Added ${quantity} to stock` : `Removed ${quantity} from stock`;
-        this.stockMessage.set({ text, error: false });
+        this.notice.show(text);
       },
-      error: (error: HttpErrorResponse) => this.stockMessage.set({ text: errorMessage(error), error: true }),
+      error: (error: HttpErrorResponse) => this.notice.showError(errorMessage(error)),
     });
   }
 
@@ -359,19 +373,20 @@ export class ProductDetail implements OnInit {
       this.service.create(details).subscribe({
         next: (created) => {
           this.markSaved();
-          this.router.navigate(['/products', created.id]);
+          this.notice.show(`${created.name} created`);
+          this.router.navigate(['/products']);
         },
-        error: (error: HttpErrorResponse) => this.formMessage.set({ text: errorMessage(error), error: true }),
+        error: (error: HttpErrorResponse) => this.notice.showError(errorMessage(error)),
       });
       return;
     }
     this.service.update(product.id, { ...details, stock: product.stock }).subscribe({
       next: (updated) => {
-        this.product.set(updated);
         this.fillForm(updated);
-        this.formMessage.set({ text: 'Changes saved', error: false });
+        this.notice.show(`${updated.name} saved`);
+        this.router.navigate(['/products']);
       },
-      error: (error: HttpErrorResponse) => this.formMessage.set({ text: errorMessage(error), error: true }),
+      error: (error: HttpErrorResponse) => this.notice.showError(errorMessage(error)),
     });
   }
 
@@ -400,9 +415,10 @@ export class ProductDetail implements OnInit {
     this.service.delete(product.id).subscribe({
       next: () => {
         this.markSaved();
+        this.notice.show(`${product.name} deleted`);
         this.router.navigate(['/products']);
       },
-      error: (error: HttpErrorResponse) => this.error.set(errorMessage(error)),
+      error: (error: HttpErrorResponse) => this.notice.show(errorMessage(error), true),
     });
   }
 }

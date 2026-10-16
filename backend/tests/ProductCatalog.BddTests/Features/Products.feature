@@ -116,6 +116,70 @@ Feature: Product catalog
     Then the response status is 200
     And the list contains "Microscopes"
 
+  Scenario: A category shows how many products use it
+    When I fetch category 2
+    Then the response status is 200
+    And the category name is "Optics"
+    And the category has 3 products
+
+  Scenario: A new category can be created and then listed
+    When I create a category named "Lenses"
+    Then the response status is 201
+    And the category has 0 products
+    When I list categories
+    Then the list contains "Lenses"
+
+  Scenario: A category name must be unique
+    When I create a category named "optics"
+    Then the response status is 409
+
+  Scenario: A category needs a name
+    When I create a category named ""
+    Then the response status is 400
+    And the error payload mentions "name"
+
+  Scenario: A category can be renamed
+    When I rename category 1 to "Stereo and upright microscopes"
+    Then the response status is 200
+    When I fetch category 1
+    Then the category name is "Stereo and upright microscopes"
+
+  Scenario: A category that products use cannot be deleted
+    When I delete category 3
+    Then the response status is 409
+
+  Scenario: Deleting a category can move its products to Uncategorized
+    When I delete category 2 and move its products to Uncategorized
+    Then the response status is 204
+    When I fetch product 100003
+    Then the product category is "Uncategorized"
+    When I fetch category 2
+    Then the response status is 404
+
+  Scenario: Deleting a category can move its products to another category
+    When I delete category 2 and move its products to category 1
+    Then the response status is 204
+    When I fetch product 100003
+    Then the product category is "Microscopes"
+
+  Scenario: Products cannot move to the category being deleted
+    When I delete category 2 and move its products to category 2
+    Then the response status is 400
+
+  Scenario: Uncategorized always exists and cannot be deleted
+    When I list categories
+    Then the list contains "Uncategorized"
+    When I delete the Uncategorized category
+    Then the response status is 409
+
+  Scenario: An empty category can be deleted
+    When I create a category named "Lenses"
+    And I remember the category id
+    When I delete the category I remembered
+    Then the response status is 204
+    When I fetch the category I remembered
+    Then the response status is 404
+
   Scenario: The configured frontend origin may call the API from a browser
     When a browser on "https://frontend.example" lists products
     Then the response status is 200

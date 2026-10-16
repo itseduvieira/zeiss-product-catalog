@@ -1,3 +1,4 @@
+using ProductCatalog.Api.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -54,11 +55,15 @@ public sealed class CatalogApp : WebApplicationFactory<Program>
 
         await db.Database.MigrateAsync();
         await db.Products.ExecuteDeleteAsync();
+        await db.Categories.ExecuteDeleteAsync();
+        db.Categories.AddRange(SeedData.Categories());
         db.Products.AddRange(SeedData.Products());
 
         var sequence = await db.IdSequences.SingleAsync(s => s.Name == IdSequence.ProductName);
         sequence.LastValue = SeedData.LastSeededProductId;
         await db.SaveChangesAsync();
+
+        await scope.ServiceProvider.GetRequiredService<ICategoryService>().EnsureUncategorizedAsync();
     }
 
     protected override void Dispose(bool disposing)

@@ -14,6 +14,7 @@ var connectionString = CatalogConnection.Resolve(
 builder.Services.AddDbContext<CatalogDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddScoped<IProductIdGenerator, ProductIdGenerator>();
 builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateProductRequestValidator>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -52,6 +53,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
     CatalogConnection.DeleteDatabaseIfHistoryIsUnknown(connectionString, db.Database.GetMigrations());
     db.Database.Migrate();
+    await scope.ServiceProvider.GetRequiredService<ICategoryService>().EnsureUncategorizedAsync();
 }
 
 app.UseHttpLogging();

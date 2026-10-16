@@ -7,7 +7,7 @@ REST API for product records, stock changes, and catalog queries.
 
 ## Overview
 
-The Product Catalog API stores products in a SQLite database and exposes them over HTTP. It covers the usual create, read, update, and delete operations, plus stock adjustments, a name search, and a stock-range query. Product ids are 6-digit integers taken from a database sequence, so two processes that share one database file do not receive the same id. It is for backend developers who build or review ASP.NET Core services and want a small catalog API with EF Core migrations, validation, and container manifests.
+The Product Catalog API stores products in a SQLite database and exposes them over HTTP. It covers the usual create, read, update, and delete operations, plus stock adjustments, a name search, a stock-range query, and managing the categories products belong to. Product ids are 6-digit integers taken from a database sequence, so two processes that share one database file do not receive the same id. It is for backend developers who build or review ASP.NET Core services and want a small catalog API with EF Core migrations, validation, and container manifests.
 
 ## Deployment
 
@@ -37,7 +37,7 @@ Start the API:
 dotnet run --project src/ProductCatalog.Api
 ```
 
-The process listens at `http://localhost:5158`. On startup it applies the EF Core migrations, creates `src/ProductCatalog.Api/catalog.db` when that file is missing, and inserts 3 categories and 8 products.
+The process listens at `http://localhost:5158`. On startup it applies the EF Core migrations, creates `src/ProductCatalog.Api/catalog.db` when that file is missing, and inserts 3 categories and 8 products. Every start also makes sure an **Uncategorized** category exists.
 
 In VS Code, open the repository folder, choose **API** in Run and Debug, and press F5. It builds the project, starts it on the same port, and opens Swagger.
 
@@ -138,7 +138,11 @@ curl -s -D - -X POST http://localhost:5158/api/products/100007/decrement-stock/1
 | `/api/products/{id}/add-to-stock/{quantity}`    | POST   | Add `quantity` to stock. Status 409 when the result would exceed 1000000. |
 | `/api/products/search?name={name}`              | GET    | Case-insensitive partial match on the name, the category name, or the product number. |
 | `/api/products/stock-level?min={min}&max={max}` | GET    | Products whose stock is from `min` through `max`, inclusive.              |
-| `/api/categories`                               | GET    | The seed categories. Use one of these ids when you create a product.      |
+| `/api/categories`                               | GET    | The categories, each with `productCount` and `isUncategorized`. Use one of these ids when you create a product. |
+| `/api/categories/{id}`                          | GET    | Fetch one category with its `productCount`. Status 404 when the id is unknown. |
+| `/api/categories`                               | POST   | Create a category. Status 201, or 409 when the name is taken.             |
+| `/api/categories/{id}`                          | PUT    | Rename a category or change its description. Status 409 when the name is taken. |
+| `/api/categories/{id}`                          | DELETE | Delete a category. Status 204, or 409 while products still use it. With `?moveProducts=true`, its products move to Uncategorized first. |
 
 
 Create and update body:
@@ -161,6 +165,20 @@ Validation rules:
 - `stock` is from 0 through 1000000. If the JSON omits `stock`, the API stores 0.
 - `categoryId` must match a category row. The seed ids are `1` Microscopes, `2` Optics, and `3` Accessories.
 
+Category body and rules:
+
+```json
+{
+  "name": "Lenses",
+  "description": "Spectacle lenses"
+}
+```
+
+- `name` is not blank, has at most 80 characters, and is unique, whatever its case.
+- `description` is optional and has at most 400 characters.
+- A category that products still use cannot be deleted, unless the delete moves its products to Uncategorized. The move and the delete happen in one transaction.
+- **Uncategorized** always exists. It cannot be deleted or renamed, but its description can change. It needs no migration: the API creates it on start when it is missing, and knows it by its name.
+
 If `name`, `price`, or `categoryId` is missing, the API returns 400. A stock quantity of 0 or less also returns 400. Unknown products return 404. If stock changes during a decrement or add, the API returns 409.
 
 Validation and not-found responses use `application/problem+json`. Field errors are in `errors`.
@@ -175,7 +193,7 @@ Each product belongs to one category. The database rejects deletion of a categor
 
 ### Design
 
-The API uses MVC so the HTTP layer stays separate from the product rules. `ProductsController` and `CategoriesController` take the call and return the status code. `ProductService` holds the rules. `ProductResponse` is the JSON the caller receives, and each list item includes `stock`.
+The API uses MVC so the HTTP layer stays separate from the product rules. `ProductsController` and `CategoriesController` take the call and return the status code. `ProductService` and `CategoryService` hold the rules. Each product belongs to one category, and `productCount` comes from that relationship. `ProductResponse` is the JSON the caller receives, and each list item includes `stock`.
 
 A request comes in over HTTP. The controller calls `ProductService`. That service checks the input, then reads and writes the database context. The context uses SQLite. The service returns a product or a list. The controller sends that result back as JSON.
 

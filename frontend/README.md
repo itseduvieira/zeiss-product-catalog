@@ -7,7 +7,7 @@ Angular app for browsing products, changing stock, and editing the catalog.
 
 ## Overview
 
-The Product Catalog frontend is the browser app for the [Product Catalog API](../backend/README.md). It lists products with their stock, then searches, filters, sorts, and pages them. It creates, edits, and deletes products, and adds or removes stock.
+The Product Catalog frontend is the browser app for the [Product Catalog API](../backend/README.md). It lists products with their stock, then searches, filters, sorts, and pages them. It creates, edits, and deletes products and their categories, and adds or removes stock.
 
 ## Deployment
 
@@ -124,12 +124,16 @@ New product → fill in the form → Create product → the new product's page o
 
 | Path | Page | Description |
 | ---- | ---- | ----------- |
-| `/products` | Product catalog | Search, filter, sort, and page the products. Tick rows to delete them, export them as CSV, or open one. |
-| `/products/{id}` | Product | The stock line with − and +, the details form, and **Delete** in the ⋮ menu. |
+| `/products` | Product catalog | Search, filter, sort, and page the products. Tick rows to delete them, export them as CSV, or open one. Each row's ⋮ menu has **Edit** and **Delete**. |
+| `/products/{id}` | Product | The stock line with − and +, the details form, and **Delete** in the ⋮ menu. An id that is not a number, or a product the API does not have, shows **Product not found** with **Go to catalog**. |
 | `/products/new` | New product | The empty form, with a starting stock. |
-| Any other | | Redirects to `/products`. |
+| `/categories` | Categories | A table of every category with its number of products, like the catalog: search by name or description, **Filters** with an **Empty only** toggle, sorting by name or products, a ⋮ menu with **Edit** and **Delete** on each row, checkboxes with a selection bar to delete several, and **New category**. Deleting a category that has products moves them to **Uncategorized**, after the dialog says how many. A row opens the category. |
+| `/categories/{id}` | Category | The details form, with **Save changes**, and **Delete** in the ⋮ menu, which moves any products to **Uncategorized**. Uncategorized itself has no **Delete**, and its name cannot change. |
+| `/categories/new` | New category | The empty form, with **Create category**. |
+| `/` | | Redirects to `/products`. |
+| Any other | Page not found | A centered message with **Go to catalog**. |
 
-The pages use every endpoint in the [API reference](../backend/README.md#api-reference), including `GET /api/categories` for the form.
+The header has a menu with **Catalog** and **Categories**, each with an icon. On phones, the menu folds into a ☰ button that opens it under the header. The pages use every endpoint in the [API reference](../backend/README.md#api-reference), including the categories for the product form.
 
 Form rules. They mirror the API's validation, so most mistakes are caught before a request:
 
@@ -137,21 +141,22 @@ Form rules. They mirror the API's validation, so most mistakes are caught before
 - **Description:** optional, at most 2000 characters.
 - **Price (€):** above 0 and at most 1.000.000,00. Prices show as 2.450,00, and the field has a 0.000,00 mask that fills from the right, like a till.
 - **Starting stock:** a whole number from 0 through 1,000,000. Only on New product. After that, stock changes only through − and +.
-- **Category:** required.
+- **Category:** required. The field is an autocomplete: typing filters the categories, and a name that does not exist yet offers **+ Create "…"**, which creates the category right away and selects it.
 
 ### Behavior
 
 - **Live search:** the search and filters run as you type. The price range, the statuses, sorting, and paging happen in the app, because the API has no such options.
 - **Stock badges:** **Out of Stock** at 0, **Critical** from 1 to 3, **Low** from 4 to 9, and **In Stock** from 10.
 - **Deletes:** every delete asks first in a dialog. Deleting ticked rows sends one request per product.
+- **Messages:** one dark notice at the bottom of the screen. Successes and delete problems fade by themselves; other errors stay until closed. Saving goes back to the list.
 - **Unsaved changes:** a notice shows while the form differs from the saved product, and leaving then asks first.
-- **Fresh data:** both pages load again every 15 seconds. If the API cannot be reached, a red ribbon offers **Try again**. Other errors show next to the action that caused them.
+- **Fresh data:** every page loads again every 15 seconds. If the API cannot be reached, a red ribbon offers **Try again**.
 
 ## Architecture
 
 ### Design
 
-The app has two pages and a frame around them. A page asks `ProductService` for data, and the service calls the API over `HttpClient`, one method per endpoint. The page keeps the answer in signals. `computed()` derives what the table shows: the filtered, sorted, and paged rows, and the selection. Every 15 seconds, the page loads again.
+The app has three pages and a frame around them. A page asks `ProductService` for data, and the service calls the API over `HttpClient`, one method per endpoint. The page keeps the answer in signals. `computed()` derives what the table shows: the filtered, sorted, and paged rows, and the selection. Every 15 seconds, the page loads again.
 
 Two small services connect the pages to the frame. `ApiStatus` turns on the red ribbon when the API cannot be reached. `Confirmation` opens the dialog and returns the user's answer.
 
@@ -168,11 +173,14 @@ src/
   styles.scss             the whole design system
   environments/           the API address per build
   app/
-    app.ts                the frame, the ribbon, and the dialog
+    app.ts                the frame, the menu, the ribbon, and the dialog
     app.config.ts         providers, routes, and the leave guard
     product.service.ts    types, HTTP calls, stockStatus(), errorMessage(), ApiStatus, Confirmation
     product-list.ts       the Product catalog page, and productsCsv()
     product-detail.ts     the Product and New product page, and the price mask
+    category-list.ts      the Categories page
+    category-detail.ts    the Category and New category page
+    category-picker.ts    the category autocomplete in the product form
 public/
   zeiss-logo.svg, staticwebapp.config.json
 ```
